@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>配送コース管理 | 配車管理システム</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
@@ -19,19 +20,14 @@
     .back-btn:hover { background: rgba(255,255,255,0.15); }
     header h1 { font-size: 18px; font-weight: 700; }
     header p { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .db-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
 
     main { max-width: 900px; margin: 0 auto; padding: 24px 32px 60px; }
     .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     .section-title { font-size: 11px; letter-spacing: 0.15em; color: #f59e0b; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; }
 
-    /* コース一覧 */
     .course-list { display: flex; flex-direction: column; gap: 6px; max-height: 600px; overflow-y: auto; }
-    .course-row {
-      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px; padding: 10px 14px;
-      display: flex; align-items: center; gap: 12px;
-      border-left: 3px solid #f59e0b;
-    }
+    .course-row { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; border-left: 3px solid #f59e0b; }
     .course-num { font-size: 16px; font-weight: 700; color: #f59e0b; min-width: 36px; font-family: monospace; }
     .course-name { flex: 1; font-size: 14px; color: rgba(255,255,255,0.8); }
     .course-name.empty { color: rgba(255,255,255,0.3); font-style: italic; }
@@ -41,13 +37,12 @@
     .btn-del { background: rgba(239,68,68,0.12); border: none; color: #f87171; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
     .btn-del:hover { background: rgba(239,68,68,0.22); }
 
-    /* フォーム */
     .add-form { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
     .add-form h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: rgba(255,255,255,0.8); }
     .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
     .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); }
-    .form-group input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit; }
-    .form-group input:focus { outline: none; border-color: #f59e0b; }
+    .form-group input, .form-group select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #f59e0b; }
     .form-group input::placeholder { color: rgba(255,255,255,0.2); }
     .form-actions { display: flex; gap: 8px; margin-top: 16px; }
     .btn-add { background: #f59e0b; color: #000; border: none; padding: 9px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 700; }
@@ -55,18 +50,11 @@
     .btn-clr { background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.5); padding: 9px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
     .btn-clr:hover { background: rgba(255,255,255,0.12); }
 
+    .depot-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 700; flex-shrink: 0; }
+    .badge-kobe  { background: rgba(6,182,212,0.2); color: #06b6d4; }
+    .badge-tamba { background: rgba(167,139,250,0.2); color: #a78bfa; }
     .empty-msg { font-size: 13px; color: rgba(255,255,255,0.25); padding: 24px; text-align: center; }
-  .depot-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 700; flex-shrink: 0; }
-  .badge-kobe  { background: rgba(6,182,212,0.2); color: #06b6d4; }
-  .badge-tamba { background: rgba(167,139,250,0.2); color: #a78bfa; }
-  .form-group select {
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-    color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
-  }
-  .form-group select:focus { outline: none; border-color: #f59e0b; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; display: none; }
-
-    /* CSVインポートボタン */
     .import-btn { background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3); color: #06b6d4; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; margin-bottom: 12px; }
     .import-btn:hover { background: rgba(6,182,212,0.25); }
   </style>
@@ -79,20 +67,18 @@
     <h1>🛣 配送コース管理</h1>
     <p>コース番号と名称を管理します</p>
   </div>
+  <span class="db-badge" id="db-badge">● DB接続中</span>
 </header>
 
 <main>
   <div class="layout">
-    <!-- 左：一覧 -->
     <div>
       <div class="section-title">登録済みコース</div>
       <button class="import-btn" onclick="importFromStores()">📥 CSVから自動取得</button>
       <div class="course-list" id="course-list">
-        <div class="empty-msg">コースが登録されていません</div>
+        <div class="empty-msg">読み込み中...</div>
       </div>
     </div>
-
-    <!-- 右：フォーム -->
     <div>
       <div class="section-title">コースを追加・編集</div>
       <div class="add-form">
@@ -125,52 +111,102 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const STORAGE_KEY = 'haisha_courses';
-// 形式: { '01': { name:'姫路エリア', depot:'2806' } }
-// 旧形式( { '01': '姫路エリア' } )は読み込み時に自動変換
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const LOCAL_KEY = 'haisha_courses';
+
+// courses: { '01': { name, depot } }
 let courses = {};
 
-function loadCourses() {
+// ============ データ読み込み ============
+async function loadCourses() {
+  // まずlocalStorageで即時表示
   try {
-    const d = localStorage.getItem(STORAGE_KEY);
-    if (d) {
-      const raw = JSON.parse(d);
+    const local = localStorage.getItem(LOCAL_KEY);
+    if (local) {
+      const raw = JSON.parse(local);
       Object.keys(raw).forEach(k => {
-        if (typeof raw[k] === 'string') {
-          raw[k] = { name: raw[k], depot: '' };
-        }
+        if (typeof raw[k] === 'string') raw[k] = { name: raw[k], depot: '' };
         if (!raw[k].depot) raw[k].depot = '';
       });
       courses = raw;
+      renderList();
     }
-  } catch(e) { courses = {}; }
+  } catch(e) {}
+
+  // Supabaseから最新を取得
+  try {
+    const { data, error } = await sb.from('courses').select('*').order('num');
+    if (error) throw error;
+    if (data && data.length > 0) {
+      courses = {};
+      data.forEach(row => {
+        courses[row.num] = { name: row.name || '', depot: row.depot || '' };
+      });
+      syncToLocal();
+      renderList();
+      document.getElementById('db-badge').textContent = '● DB接続済み';
+    }
+  } catch(e) {
+    console.warn('Supabase読み込みエラー:', e);
+    document.getElementById('db-badge').style.background = 'rgba(239,68,68,0.15)';
+    document.getElementById('db-badge').style.color = '#f87171';
+    document.getElementById('db-badge').textContent = '● オフライン';
+  }
 }
 
-function saveCourses() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
+function syncToLocal() {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(courses));
 }
 
-function getCourseName(num) {
-  const c = courses[num];
-  if (!c) return '';
-  return typeof c === 'string' ? c : (c.name || '');
+// ============ 保存 ============
+async function saveCourse() {
+  const num   = document.getElementById('new-num').value.trim();
+  const name  = document.getElementById('new-name').value.trim();
+  const depot = document.getElementById('new-depot').value;
+  if (!num) { alert('コース番号は必須です'); return; }
+
+  const editNum = document.getElementById('form-title').dataset.editNum;
+  if (editNum && editNum !== num) {
+    // 番号変更：旧レコードを削除
+    delete courses[editNum];
+    await sb.from('courses').delete().eq('num', editNum);
+  }
+
+  courses[num] = { name, depot };
+  syncToLocal();
+  renderList();
+  clearForm();
+
+  // Supabase upsert
+  const { error } = await sb.from('courses').upsert({ num, name, depot }, { onConflict: 'num' });
+  if (error) { console.error(error); showToast('⚠️ DB保存エラー（ローカルには保存済み）'); return; }
+  showToast(num + (name ? ' (' + name + ')' : '') + ' を保存しました');
 }
-function getCourseDepot(num) {
-  const c = courses[num];
-  if (!c) return '';
-  return typeof c === 'string' ? '' : (c.depot || '');
+
+// ============ 削除 ============
+async function deleteCourse(num) {
+  if (!confirm('コース「' + num + '」を削除しますか？')) return;
+  delete courses[num];
+  syncToLocal();
+  renderList();
+  showToast('削除しました');
+  const { error } = await sb.from('courses').delete().eq('num', num);
+  if (error) console.error('DB削除エラー:', error);
 }
+
+// ============ 表示 ============
+function getCourseName(num) { const c = courses[num]; if (!c) return ''; return typeof c === 'string' ? c : (c.name || ''); }
+function getCourseDepot(num) { const c = courses[num]; if (!c) return ''; return typeof c === 'string' ? '' : (c.depot || ''); }
 
 function renderList() {
   const el = document.getElementById('course-list');
   const nums = Object.keys(courses).sort();
-  if (nums.length === 0) {
-    el.innerHTML = '<div class="empty-msg">コースが登録されていません</div>';
-    return;
-  }
+  if (nums.length === 0) { el.innerHTML = '<div class="empty-msg">コースが登録されていません</div>'; return; }
   el.innerHTML = '';
   nums.forEach(num => {
-    const name  = getCourseName(num);
+    const name = getCourseName(num);
     const depot = getCourseDepot(num);
     const depotLabel = depot === '2806' ? '🏭神戸西' : depot === '2805' ? '🏭丹波' : '';
     const depotClass = depot === '2806' ? 'badge-kobe' : depot === '2805' ? 'badge-tamba' : '';
@@ -183,100 +219,83 @@ function renderList() {
       <div class="course-actions">
         <button class="btn-edit" onclick="editCourse('${num}')">編集</button>
         <button class="btn-del" onclick="deleteCourse('${num}')">削除</button>
-      </div>
-    `;
+      </div>`;
     el.appendChild(row);
   });
 }
 
-function saveCourse() {
-  const num   = document.getElementById('new-num').value.trim();
-  const name  = document.getElementById('new-name').value.trim();
-  const depot = document.getElementById('new-depot') ? document.getElementById('new-depot').value : '';
-  if (!num) { alert('コース番号は必須です'); return; }
-
-  const editNum = document.getElementById('form-title').dataset.editNum;
-  if (editNum && editNum !== num) {
-    delete courses[editNum];
-  }
-  courses[num] = { name: name, depot: depot };
-  saveCourses();
-  renderList();
-  clearForm();
-  showToast(num + (name ? ' (' + name + ')' : '') + ' を保存しました');
-}
-
 function editCourse(num) {
-  document.getElementById('new-num').value  = num;
+  document.getElementById('new-num').value = num;
   document.getElementById('new-name').value = getCourseName(num);
-  const depotEl = document.getElementById('new-depot');
-  if (depotEl) depotEl.value = getCourseDepot(num);
-  document.getElementById('form-title').textContent  = '編集: ' + num;
+  document.getElementById('new-depot').value = getCourseDepot(num);
+  document.getElementById('form-title').textContent = '編集: ' + num;
   document.getElementById('form-title').dataset.editNum = num;
 }
 
-function deleteCourse(num) {
-  if (!confirm('コース「' + num + '」を削除しますか？')) return;
-  delete courses[num];
-  saveCourses();
-  renderList();
-  showToast('削除しました');
-}
-
 function clearForm() {
-  document.getElementById('new-num').value  = '';
+  document.getElementById('new-num').value = '';
   document.getElementById('new-name').value = '';
-  const depotEl = document.getElementById('new-depot');
-  if (depotEl) depotEl.value = '';
+  document.getElementById('new-depot').value = '';
   document.getElementById('form-title').textContent = '新規登録';
   document.getElementById('form-title').dataset.editNum = '';
 }
 
-// 店舗データからコース番号・デポを自動取得
-function importFromStores() {
+// CSVから自動取得（店舗データから）
+async function importFromStores() {
+  // localStorageとSupabase両方から取得
+  let storeData = {};
+  try { storeData = JSON.parse(localStorage.getItem('haisha_stores') || '{}'); } catch(e) {}
+
+  // Supabaseからも補完
   try {
-    const storeData = JSON.parse(localStorage.getItem('haisha_stores') || '{}');
-    const found = new Set();
-    const courseDepotMap = {};
-    Object.values(storeData).forEach(s => {
-      if (s.course && s.course.trim()) {
-        found.add(s.course.trim());
-        if (s.depot) courseDepotMap[s.course.trim()] = s.depot;
-      }
+    const { data } = await sb.from('stores').select('code, course, depot');
+    if (data) data.forEach(s => {
+      if (!storeData[s.code]) storeData[s.code] = s;
     });
-    if (found.size === 0) {
-      alert('店舗データにコース番号が見つかりません。\nCSVを読み込んでから再試行してください。');
-      return;
+  } catch(e) {}
+
+  const found = new Set();
+  const courseDepotMap = {};
+  Object.values(storeData).forEach(s => {
+    if (s.course && s.course.trim()) {
+      found.add(s.course.trim());
+      if (s.depot) courseDepotMap[s.course.trim()] = s.depot;
     }
-    let added = 0;
-    found.forEach(num => {
-      if (!courses[num]) {
-        courses[num] = { name: '', depot: courseDepotMap[num] || '' };
-        added++;
-      } else {
-        // 既存でデポ未設定なら補完
-        if (!getCourseDepot(num) && courseDepotMap[num]) {
-          courses[num].depot = courseDepotMap[num];
-        }
-      }
-    });
-    saveCourses();
-    renderList();
-    showToast(added + '件のコースを取得しました');
-  } catch(e) {
-    alert('取得に失敗しました: ' + e.message);
+  });
+
+  if (found.size === 0) { alert('店舗データにコース番号が見つかりません。'); return; }
+
+  let added = 0;
+  const upserts = [];
+  found.forEach(num => {
+    const depotVal = courseDepotMap[num] || '';
+    if (!courses[num]) {
+      courses[num] = { name: '', depot: depotVal };
+      added++;
+    } else if (!getCourseDepot(num) && depotVal) {
+      courses[num].depot = depotVal;
+    }
+    upserts.push({ num, name: courses[num].name || '', depot: courses[num].depot || '' });
+  });
+
+  syncToLocal();
+  renderList();
+
+  // Supabaseに一括upsert
+  if (upserts.length > 0) {
+    const { error } = await sb.from('courses').upsert(upserts, { onConflict: 'num' });
+    if (error) console.error('Supabase upsert error:', error);
   }
+  showToast(added + '件のコースを取得しました');
 }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 2500);
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
 }
 
 loadCourses();
-renderList();
 </script>
 </body>
 </html>

@@ -268,6 +268,37 @@ function loadDrivers() {
 }
 function saveDrivers() { localStorage.setItem('haisha_drivers', JSON.stringify(drivers)); }
 
+// Supabaseから最新のドライバーデータを取得してlocalStorageを更新
+async function syncDriversFromSupabase() {
+  try {
+    const { data, error } = await sbClient.from('drivers').select('*').order('code');
+    if (error) throw error;
+    if (!data || data.length === 0) return;
+    // Supabaseのデータ形式→アプリ形式に変換
+    const synced = data.map(row => ({
+      id: row.id || Date.now() + Math.random(),
+      code: row.code || '',
+      name: row.name || '',
+      depot: row.depot || '',
+      vehicle: row.vehicle || '',
+      vehicleId: row.vehicle_id || '',
+      phone: row.phone || '',
+      courses: row.courses ? row.courses.split(',').filter(Boolean) : [],
+      coursesBin2: row.courses_bin2 ? row.courses_bin2.split(',').filter(Boolean) : [],
+      carrier: row.carrier || '',
+      availableToday: row.available_today !== false,
+      yoizumiToday: row.yoizumi_today || false,
+      note: row.note || '',
+    }));
+    drivers = synced;
+    saveDrivers();
+    renderList();
+    console.log('Supabaseから' + synced.length + '名のドライバーを同期しました');
+  } catch(e) {
+    console.warn('Supabase同期エラー:', e);
+  }
+}
+
 // Supabaseにドライバー1件をupsert（登録・更新）
 async function syncDriverToSupabase(driver) {
   try {
@@ -506,11 +537,12 @@ function updateVehicleOptions(selectedId) {
   });
 }
 loadCourseMap();
-loadDrivers();
+loadDrivers();        // まずlocalStorageで即時表示
 updateCarrierOptions();
 updateVehicleOptions('');
 renderList();
 setTimeout(() => renderCourseCheckboxes([], []), 0);
+syncDriversFromSupabase(); // 非同期でSupabaseから最新を取得
 </script>
 </body>
 </html>

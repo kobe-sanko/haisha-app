@@ -217,7 +217,13 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+let sbStores = null;
+try { sbStores = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) {}
+
 // ====================================================
 // データ管理
 // ====================================================
@@ -242,6 +248,74 @@ function saveStores() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stores));
   } catch(e) { showToast('保存に失敗しました', true); }
+}
+
+// Supabaseから店舗データを同期（起動時に呼ぶ）
+async function syncStoresFromSupabase() {
+  if (!sbStores) return;
+  try {
+    // 500件ずつページング取得
+    let allData = [];
+    let from = 0;
+    const PAGE = 500;
+    while (true) {
+      const { data, error } = await sbStores.from('stores').select('*').range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      allData = allData.concat(data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    if (allData.length === 0) return;
+    allData.forEach(row => {
+      stores[row.code] = {
+        name:        row.name || '',
+        addr:        row.addr || '',
+        lat:         row.lat,
+        lng:         row.lng,
+        course:      row.course || '',
+        depot:       row.depot || '',
+        depotManual: row.depot_manual || false,
+        customLat:   row.custom_lat,
+        customLng:   row.custom_lng,
+        hasCustom:   row.has_custom || false,
+        coordStatus: row.coord_status || 'auto',
+      };
+    });
+    saveStores();
+    autoFillDepotFromCourses();
+    renderCourseFilterBar();
+    renderList();
+    console.log('Supabaseから' + allData.length + '件の店舗を同期しました');
+  } catch(e) {
+    console.warn('店舗Supabase同期エラー:', e);
+  }
+}
+
+// 店舗1件をSupabaseにupsert
+async function syncStoreToSupabase(code) {
+  if (!sbStores) return;
+  const s = stores[code];
+  if (!s) return;
+  try {
+    await sbStores.from('stores').upsert({
+      code,
+      name:         s.name || '',
+      addr:         s.addr || '',
+      lat:          s.lat || null,
+      lng:          s.lng || null,
+      course:       s.course || '',
+      depot:        s.depot || '',
+      depot_manual: s.depotManual || false,
+      custom_lat:   s.customLat || null,
+      custom_lng:   s.customLng || null,
+      has_custom:   s.hasCustom || false,
+      coord_status: s.coordStatus || 'auto',
+      updated_at:   new Date().toISOString(),
+    }, { onConflict: 'code' });
+  } catch(e) {
+    console.error('店舗Supabase upsertエラー:', e);
+  }
 }
 
 // ====================================================
@@ -593,7 +667,9 @@ function showToast(msg, isError = false) {
 // 初期化
 // ====================================================
 loadStores();
+autoFillDepotFromCourses();
 renderCourseFilterBar();
 renderList();
+syncStoresFromSupabase(); // Supabaseから最新を非同期で取得
 
 </script>

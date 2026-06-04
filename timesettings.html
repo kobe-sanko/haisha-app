@@ -187,7 +187,13 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+let sbSettings = null;
+try { sbSettings = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) {}
 const STORAGE_KEY = 'haisha_time_settings';
 
 const DEFAULTS = {
@@ -214,6 +220,18 @@ function loadSettings() {
   } catch(e) {}
 }
 
+async function syncSettingsFromSupabase() {
+  if (!sbSettings) return;
+  try {
+    const { data, error } = await sbSettings.from('settings').select('value').eq('key', 'time_settings').single();
+    if (error || !data) return;
+    settings = data.value;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    applyToForm();
+    console.log('時間設定をSupabaseから同期しました');
+  } catch(e) { console.warn('設定同期エラー:', e); }
+}
+
 function saveSettings() {
   settings.speed = Number(document.getElementById('speed').value) || 25;
   settings.unloadSteps = readRows('unload');
@@ -221,6 +239,11 @@ function saveSettings() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   showToast('保存しました');
   updatePreviews();
+  // Supabaseにも保存
+  if (sbSettings) {
+    sbSettings.from('settings').upsert({ key: 'time_settings', value: settings, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .then(({ error }) => { if (error) console.error('設定保存エラー:', error); });
+  }
 }
 
 function resetDefaults() {
@@ -305,6 +328,7 @@ function showToast(msg) {
 loadSettings();
 applyToForm();
 showCacheInfo();
+syncSettingsFromSupabase(); // Supabaseから最新を取得
 
 // ====================================================
 // 移動時間キャッシュ（Google Distance Matrix API）
