@@ -482,6 +482,61 @@ function loadDrivers() {
   try { const d = localStorage.getItem('haisha_drivers'); if (d) drivers = JSON.parse(d); } catch(e) { drivers = []; }
 }
 
+async function syncDriversFromSupabase() {
+  try {
+    const { data, error } = await sbClient.from('drivers').select('*').order('code');
+    if (error || !data || data.length === 0) return;
+    const synced = data.map(row => ({
+      id: row.id || Date.now() + Math.random(),
+      code: row.code || '', name: row.name || '',
+      depot: row.depot || '', vehicle: row.vehicle || '',
+      vehicleId: row.vehicle_id || '', phone: row.phone || '',
+      courses: row.courses ? row.courses.split(',').filter(Boolean) : [],
+      coursesBin2: row.courses_bin2 ? row.courses_bin2.split(',').filter(Boolean) : [],
+      carrier: row.carrier || '',
+      availableToday: row.available_today !== false,
+      yoizumiToday: row.yoizumi_today || false,
+      note: row.note || '',
+    }));
+    drivers = synced;
+    saveDrivers();
+    renderDriverSidebar();
+  } catch(e) { console.warn('ドライバー同期エラー:', e); }
+}
+
+async function syncStoresFromSupabase() {
+  try {
+    let allData = [], from = 0;
+    while (true) {
+      const { data, error } = await sbClient.from('stores').select('*').range(from, from + 499);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      allData = allData.concat(data);
+      if (data.length < 500) break;
+      from += 500;
+    }
+    if (allData.length === 0) return;
+    let savedStores = {};
+    try { savedStores = JSON.parse(localStorage.getItem('haisha_stores') || '{}'); } catch(e) {}
+    allData.forEach(row => {
+      if (!savedStores[row.code]) {
+        savedStores[row.code] = {
+          name: row.name || '', addr: row.addr || '',
+          lat: row.lat, lng: row.lng,
+          course: row.course || '', depot: row.depot || '',
+          depotManual: row.depot_manual || false,
+          customLat: row.custom_lat, customLng: row.custom_lng,
+          hasCustom: row.has_custom || false,
+        };
+      } else {
+        if (!savedStores[row.code].depot && row.depot) savedStores[row.code].depot = row.depot;
+        if (!savedStores[row.code].lat && row.lat) { savedStores[row.code].lat = row.lat; savedStores[row.code].lng = row.lng; }
+      }
+    });
+    localStorage.setItem('haisha_stores', JSON.stringify(savedStores));
+  } catch(e) { console.warn('店舗同期エラー:', e); }
+}
+
 // ===== 日付ラベル更新 =====
 function updateDateLabel() {
   const el = document.getElementById('current-date-label');
@@ -1056,6 +1111,19 @@ function loadCSV(file) {
           if (shop.depotCode) savedStores[shop.code].depot = shop.depotCode;
         });
         try { localStorage.setItem('haisha_stores', JSON.stringify(savedStores)); } catch(e) {}
+        (async () => {
+          try {
+            const upserts = shops.map(shop => {
+              const s = savedStores[shop.code];
+              return { code: shop.code, name: s.name||'', addr: s.addr||'',
+                lat: s.lat||null, lng: s.lng||null, course: s.course||'', depot: s.depot||'',
+                depot_manual: s.depotManual||false, updated_at: new Date().toISOString() };
+            }).filter(s => s.code);
+            for (let i = 0; i < upserts.length; i += 50) {
+              await sbClient.from('stores').upsert(upserts.slice(i,i+50), { onConflict: 'code' });
+            }
+          } catch(e) { console.error('店舗Supabase保存エラー:', e); }
+        })();
 
         if (!appendMode) {
           markers.forEach(m => m.setMap(null)); markers = [];
@@ -2316,6 +2384,7 @@ function nearestNeighbor(locs,start) {
 }
 
 loadDrivers();
+(async () => { await syncDriversFromSupabase(); await syncStoresFromSupabase(); })();
 loadDepotsFromStorage();
 checkSupabase();
 renderDriverSidebar();
