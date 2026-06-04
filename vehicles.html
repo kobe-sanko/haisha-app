@@ -5,70 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>車種設定 | 配車管理システム</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
-    body::before {
-      content: ''; position: fixed; inset: 0;
-      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px; pointer-events: none;
-    }
+    body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
     header { padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 16px; }
     .back-btn { background: rgba(255,255,255,0.08); border: none; color: white; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
     .back-btn:hover { background: rgba(255,255,255,0.15); }
     header h1 { font-size: 18px; font-weight: 700; }
     header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
-
+    .db-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
     main { max-width: 1100px; margin: 0 auto; padding: 24px 32px 60px; }
     .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     .section-title { font-size: 11px; letter-spacing: 0.15em; color: #f59e0b; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; }
-
-    /* 統計 */
-    .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 24px; }
+    .stats-row { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 24px; }
     .stat-card { background: #161f2c; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 16px; }
     .stat-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
     .stat-value { font-size: 22px; font-weight: 700; }
     .stat-value span { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.4); }
-
-    /* 車両リスト */
     .vehicle-list { display: flex; flex-direction: column; gap: 8px; }
-    .vehicle-row {
-      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 10px; padding: 14px 16px;
-      border-left: 3px solid #f59e0b;
-    }
+    .vehicle-row { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; border-left: 3px solid #f59e0b; }
     .vehicle-row:hover { border-color: rgba(255,255,255,0.2); }
-    .vehicle-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
-    .vehicle-caps {
-      display: flex; gap: 12px; font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 6px;
-    }
-    .cap-badge {
-      background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25);
-      border-radius: 5px; padding: 2px 10px; color: #fcd34d; font-weight: 700; font-size: 12px;
-    }
-    .vehicle-driver { font-size: 12px; color: rgba(255,255,255,0.4); }
-    .vehicle-note   { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px; }
+    .vehicle-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .vehicle-caps { display: flex; gap: 12px; font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 6px; }
+    .cap-badge { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 2px 10px; color: #fcd34d; font-weight: 700; font-size: 12px; }
+    .vehicle-note { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 4px; }
     .vehicle-actions { display: flex; gap: 6px; margin-top: 10px; }
     .btn-edit { background: rgba(255,255,255,0.08); border: none; color: white; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; font-family: inherit; }
     .btn-edit:hover { background: rgba(255,255,255,0.15); }
     .btn-del  { background: rgba(239,68,68,0.12); border: none; color: #f87171; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; font-family: inherit; }
     .btn-del:hover { background: rgba(239,68,68,0.22); }
-
-    /* フォーム */
-    .add-form {
-      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px; padding: 20px;
-    }
+    .add-form { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
     .add-form h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: rgba(255,255,255,0.8); }
     .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
     .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); }
-    .form-group input, .form-group select {
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-      color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
-    }
-    .form-group select { background: #1e2d3d; }
-    .form-group input:focus, .form-group select:focus { outline: none; border-color: #f59e0b; }
+    .form-group input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit; }
+    .form-group input:focus { outline: none; border-color: #f59e0b; }
     .form-group input::placeholder { color: rgba(255,255,255,0.2); }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .form-actions { display: flex; gap: 8px; margin-top: 16px; }
@@ -76,48 +49,36 @@
     .btn-add:hover { background: #d97706; }
     .btn-clr { background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.5); padding: 9px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
     .btn-clr:hover { background: rgba(255,255,255,0.12); }
-
     .empty-msg { font-size: 13px; color: rgba(255,255,255,0.25); padding: 24px; text-align: center; }
-
-    .toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: #10b981; color: white; padding: 10px 24px; border-radius: 20px;
-      font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; display: none;
-    }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; display: none; }
   </style>
 </head>
 <body>
-
 <header>
   <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
   <div>
     <h1>🚛 車種設定</h1>
     <p>車種ごとの最大積載量（才数・個数）を管理します</p>
   </div>
+  <span class="db-badge" id="db-badge">● DB接続中</span>
 </header>
 
 <main>
-  <div class="stats-row" style="grid-template-columns: 1fr;">
+  <div class="stats-row">
     <div class="stat-card">
       <div class="stat-label">登録車種数</div>
       <div class="stat-value" id="stat-total">0<span>種類</span></div>
     </div>
   </div>
-
   <div class="layout">
-    <!-- 左：一覧 -->
     <div>
       <div class="section-title">登録済み車種</div>
-      <div class="vehicle-list" id="vehicle-list">
-        <div class="empty-msg">車両が登録されていません</div>
-      </div>
+      <div class="vehicle-list" id="vehicle-list"><div class="empty-msg">読み込み中...</div></div>
     </div>
-
-    <!-- 右：フォーム -->
     <div>
       <div class="section-title">車種を追加・編集</div>
       <div class="add-form">
-        <h3 id="form-title" data-edit-id="">新規登録</h3>
+        <h3 id="form-title" data-edit-name="">新規登録</h3>
         <div class="form-group">
           <label>車種名 *</label>
           <input type="text" id="new-name" placeholder="例：2tトラック">
@@ -125,11 +86,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>最大積載才数</label>
-            <input type="number" id="new-maxvol" placeholder="例：100" min="0" step="1">
+            <input type="number" id="new-maxvol" placeholder="例：100" min="0">
           </div>
           <div class="form-group">
             <label>最大積載個数</label>
-            <input type="number" id="new-maxitems" placeholder="例：50" min="0" step="1">
+            <input type="number" id="new-maxitems" placeholder="例：50" min="0">
           </div>
         </div>
         <div class="form-group">
@@ -144,118 +105,166 @@
     </div>
   </div>
 </main>
-
 <div class="toast" id="toast"></div>
 
 <script>
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const LOCAL_KEY = 'haisha_vehicles';
+
 let vehicles = [];
 
-// ===== データ読み書き =====
-function loadVehicles() {
+// ============ 読み込み ============
+async function loadVehicles() {
+  // localStorageで即時表示
   try {
-    const d = localStorage.getItem('haisha_vehicles');
-    if (d) { vehicles = JSON.parse(d); return; }
+    const d = localStorage.getItem(LOCAL_KEY);
+    if (d) { vehicles = JSON.parse(d); renderList(); updateStats(); }
   } catch(e) {}
 
-  // ダミーデータ（初回のみ）
-  vehicles = [
-    { id: 1, name: '2tトラックA', maxVol: 100, maxItems: 50, note: '標準車両' },
-    { id: 2, name: '2tトラックB', maxVol: 80,  maxItems: 40, note: '標準車両' },
-    { id: 3, name: '3tトラックC', maxVol: 120, maxItems: 60, note: '大型対応' },
+  // Supabaseから最新を取得
+  try {
+    const { data, error } = await sb.from('vehicles').select('*').order('name');
+    if (error) throw error;
+    if (data && data.length > 0) {
+      vehicles = data.map(row => ({
+        id: row.id, name: row.name,
+        maxVol: row.max_vol || 0, maxItems: row.max_items || 0,
+        note: row.note || ''
+      }));
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(vehicles));
+      renderList(); updateStats();
+      document.getElementById('db-badge').textContent = '● DB接続済み';
+    } else if (!localStorage.getItem(LOCAL_KEY)) {
+      // Supabaseが空でlocalStorageも空なら初期データを投入
+      await seedDefaults();
+    }
+  } catch(e) {
+    console.warn('Supabase読み込みエラー:', e);
+    document.getElementById('db-badge').style.background = 'rgba(239,68,68,0.15)';
+    document.getElementById('db-badge').style.color = '#f87171';
+    document.getElementById('db-badge').textContent = '● オフライン';
+    // localStorageにもなければ初期データ
+    if (vehicles.length === 0) seedDefaultsLocal();
+  }
+}
+
+async function seedDefaults() {
+  const defaults = [
+    { name: '2tトラック', max_vol: 450, max_items: 150, note: '標準車両' },
+    { name: '4tトラック', max_vol: 720, max_items: 240, note: '大型対応' },
   ];
-  saveVehicles();
+  const { data } = await sb.from('vehicles').upsert(defaults, { onConflict: 'name' }).select();
+  if (data) {
+    vehicles = data.map(row => ({ id: row.id, name: row.name, maxVol: row.max_vol, maxItems: row.max_items, note: row.note || '' }));
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(vehicles));
+    renderList(); updateStats();
+  }
 }
 
-function saveVehicles() {
-  localStorage.setItem('haisha_vehicles', JSON.stringify(vehicles));
+function seedDefaultsLocal() {
+  vehicles = [
+    { id: 1, name: '2tトラック', maxVol: 450, maxItems: 150, note: '標準車両' },
+    { id: 2, name: '4tトラック', maxVol: 720, maxItems: 240, note: '大型対応' },
+  ];
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(vehicles));
+  renderList(); updateStats();
 }
 
-// ===== 統計更新 =====
-function updateStats() {
-  document.getElementById('stat-total').innerHTML = vehicles.length + '<span>種類</span>';
+// ============ 保存 ============
+async function saveVehicle() {
+  const name     = document.getElementById('new-name').value.trim();
+  const maxVol   = parseFloat(document.getElementById('new-maxvol').value) || 0;
+  const maxItems = parseInt(document.getElementById('new-maxitems').value) || 0;
+  const note     = document.getElementById('new-note').value.trim();
+  if (!name) { alert('車種名は必須です'); return; }
+
+  const editName = document.getElementById('form-title').dataset.editName;
+
+  // localStorageを更新
+  if (editName) {
+    const idx = vehicles.findIndex(v => v.name === editName);
+    if (idx >= 0) vehicles[idx] = { ...vehicles[idx], name, maxVol, maxItems, note };
+  } else {
+    vehicles.push({ id: Date.now(), name, maxVol, maxItems, note });
+  }
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(vehicles));
+  renderList(); updateStats(); clearForm();
+
+  // Supabaseにupsert
+  try {
+    const row = { name, max_vol: maxVol, max_items: maxItems, note };
+    if (editName && editName !== name) {
+      // 名前変更：旧レコードを削除して新規作成
+      await sb.from('vehicles').delete().eq('name', editName);
+    }
+    const { error } = await sb.from('vehicles').upsert(row, { onConflict: 'name' });
+    if (error) throw error;
+    showToast(editName ? '更新しました' : name + ' を登録しました');
+  } catch(e) {
+    console.error('Supabase保存エラー:', e);
+    showToast('⚠️ DB保存エラー（ローカルには保存済み）');
+  }
 }
 
-// ===== 一覧描画 =====
+// ============ 削除 ============
+async function deleteVehicle(name) {
+  const v = vehicles.find(x => x.name === name);
+  if (!v || !confirm('「' + v.name + '」を削除しますか？')) return;
+  vehicles = vehicles.filter(x => x.name !== name);
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(vehicles));
+  renderList(); updateStats(); showToast('削除しました');
+  try {
+    await sb.from('vehicles').delete().eq('name', name);
+  } catch(e) { console.error('Supabase削除エラー:', e); }
+}
+
+// ============ 表示 ============
 function renderList() {
   const el = document.getElementById('vehicle-list');
-  if (vehicles.length === 0) {
-    el.innerHTML = '<div class="empty-msg">車種が登録されていません</div>';
-    return;
-  }
-
+  if (vehicles.length === 0) { el.innerHTML = '<div class="empty-msg">車種が登録されていません</div>'; return; }
   el.innerHTML = '';
-  vehicles.forEach(function(v) {
+  vehicles.forEach(v => {
     const row = document.createElement('div');
     row.className = 'vehicle-row';
-    row.innerHTML =
-      '<div class="vehicle-name">🚛 ' + escHtml(v.name) + '</div>' +
-      '<div class="vehicle-caps">' +
-        '<span class="cap-badge">最大 ' + (v.maxVol   || '制限なし') + ' 才</span>' +
-        '<span class="cap-badge">最大 ' + (v.maxItems || '制限なし') + ' 個</span>' +
-      '</div>' +
-
-      (v.note ? '<div class="vehicle-note">📝 ' + escHtml(v.note) + '</div>' : '') +
-      '<div class="vehicle-actions">' +
-        '<button class="btn-edit" onclick="editVehicle(' + v.id + ')">編集</button>' +
-        '<button class="btn-del"  onclick="deleteVehicle(' + v.id + ')">削除</button>' +
-      '</div>';
+    row.innerHTML = `
+      <div class="vehicle-name">🚛 ${escHtml(v.name)}</div>
+      <div class="vehicle-caps">
+        <span class="cap-badge">最大 ${v.maxVol || '制限なし'} 才</span>
+        <span class="cap-badge">最大 ${v.maxItems || '制限なし'} 個</span>
+      </div>
+      ${v.note ? `<div class="vehicle-note">📝 ${escHtml(v.note)}</div>` : ''}
+      <div class="vehicle-actions">
+        <button class="btn-edit" onclick="editVehicle('${escHtml(v.name)}')">編集</button>
+        <button class="btn-del"  onclick="deleteVehicle('${escHtml(v.name)}')">削除</button>
+      </div>`;
     el.appendChild(row);
   });
 }
 
-// ===== 保存 =====
-function saveVehicle() {
-  const name     = document.getElementById('new-name').value.trim();
-  const maxVol   = parseFloat(document.getElementById('new-maxvol').value)   || 0;
-  const maxItems = parseInt(document.getElementById('new-maxitems').value)   || 0;
-  const note     = document.getElementById('new-note').value.trim();
-
-  if (!name) { alert('車種名は必須です'); return; }
-
-  const editId = document.getElementById('form-title').dataset.editId || '';
-  if (editId) {
-    const idx = vehicles.findIndex(function(v) { return String(v.id) === String(editId); });
-    if (idx >= 0) vehicles[idx] = Object.assign({}, vehicles[idx], { name, maxVol, maxItems, note });
-    document.getElementById('form-title').textContent = '新規登録';
-    document.getElementById('form-title').dataset.editId = '';
-    showToast('更新しました');
-  } else {
-    vehicles.push({ id: Date.now(), name, maxVol, maxItems, note });
-    showToast(name + ' を登録しました');
-  }
-  saveVehicles(); renderList(); updateStats(); clearForm();
-}
-
-// ===== 編集 =====
-function editVehicle(id) {
-  const v = vehicles.find(function(x) { return x.id === id; });
+function editVehicle(name) {
+  const v = vehicles.find(x => x.name === name);
   if (!v) return;
-  document.getElementById('new-name').value    = v.name;
-  document.getElementById('new-maxvol').value  = v.maxVol   || '';
-  document.getElementById('new-maxitems').value= v.maxItems || '';
-  document.getElementById('new-note').value    = v.note     || '';
-  document.getElementById('form-title').textContent = '編集: ' + v.name;
-  document.getElementById('form-title').dataset.editId = v.id;
-  window.scrollTo(0, 0);
+  document.getElementById('new-name').value     = v.name;
+  document.getElementById('new-maxvol').value   = v.maxVol   || '';
+  document.getElementById('new-maxitems').value = v.maxItems || '';
+  document.getElementById('new-note').value     = v.note     || '';
+  document.getElementById('form-title').textContent    = '編集: ' + v.name;
+  document.getElementById('form-title').dataset.editName = v.name;
 }
 
-// ===== 削除 =====
-function deleteVehicle(id) {
-  const v = vehicles.find(function(x) { return x.id === id; });
-  if (!v || !confirm('「' + v.name + '」を削除しますか？')) return;
-  vehicles = vehicles.filter(function(x) { return x.id !== id; });
-  saveVehicles(); renderList(); updateStats();
-  showToast('削除しました');
-}
-
-// ===== フォームクリア =====
 function clearForm() {
   document.getElementById('new-name').value     = '';
   document.getElementById('new-maxvol').value   = '';
   document.getElementById('new-maxitems').value = '';
   document.getElementById('new-note').value     = '';
-  document.getElementById('form-title').textContent = '新規登録';
-  document.getElementById('form-title').dataset.editId = '';
+  document.getElementById('form-title').textContent    = '新規登録';
+  document.getElementById('form-title').dataset.editName = '';
+}
+
+function updateStats() {
+  document.getElementById('stat-total').innerHTML = vehicles.length + '<span>種類</span>';
 }
 
 function escHtml(str) {
@@ -265,13 +274,10 @@ function escHtml(str) {
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.display = 'block';
-  setTimeout(function() { t.style.display = 'none'; }, 2500);
+  setTimeout(() => t.style.display = 'none', 2500);
 }
 
-// ===== 初期化 =====
 loadVehicles();
-renderList();
-updateStats();
 </script>
 </body>
 </html>
