@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>時間管理設定 | 配車管理システム</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
+    }
+    header { padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 16px; }
+    .back-btn { background: rgba(255,255,255,0.08); border: none; color: white; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+    .back-btn:hover { background: rgba(255,255,255,0.15); }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    main { max-width: 860px; margin: 0 auto; padding: 28px 32px 80px; }
+
+    .section { margin-bottom: 32px; }
+    .section-title { font-size: 11px; letter-spacing: 0.15em; color: #f59e0b; font-weight: 700; margin-bottom: 14px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+
+    .card { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+
+    /* 基本設定 */
+    .basic-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 11px; color: rgba(255,255,255,0.45); }
+    .form-group input, .form-group select {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #f59e0b; }
+    .form-group input::placeholder { color: rgba(255,255,255,0.2); }
+
+    /* 段階テーブル */
+    .table-desc { font-size: 12px; color: rgba(255,255,255,0.4); margin-bottom: 12px; line-height: 1.6; }
+    .step-table { width: 100%; border-collapse: collapse; }
+    .step-table th { font-size: 11px; color: rgba(255,255,255,0.4); font-weight: 500; padding: 6px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .step-table td { padding: 6px 6px; vertical-align: middle; }
+    .step-table tr:not(:last-child) td { border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .step-table input {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+      color: white; border-radius: 5px; padding: 6px 10px; font-size: 13px;
+      font-family: inherit; width: 100%;
+    }
+    .step-table input:focus { outline: none; border-color: #f59e0b; }
+    .step-table .range-sep { color: rgba(255,255,255,0.3); font-size: 13px; padding: 0 4px; text-align: center; width: 16px; }
+    .step-table .unit { color: rgba(255,255,255,0.35); font-size: 11px; padding-left: 6px; white-space: nowrap; }
+    .btn-del { background: rgba(239,68,68,0.12); border: none; color: #f87171; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .btn-del:hover { background: rgba(239,68,68,0.22); }
+    .btn-add { background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.15); color: rgba(255,255,255,0.5); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; margin-top: 10px; width: 100%; transition: all 0.15s; }
+    .btn-add:hover { background: rgba(255,255,255,0.1); color: white; }
+
+    /* ボタン */
+    .actions { display: flex; gap: 10px; margin-top: 28px; }
+    .btn-save { background: #f59e0b; color: #000; border: none; padding: 10px 28px; border-radius: 7px; cursor: pointer; font-size: 14px; font-family: inherit; font-weight: 700; }
+    .btn-save:hover { background: #d97706; }
+    .btn-reset { background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.5); padding: 10px 20px; border-radius: 7px; cursor: pointer; font-size: 14px; font-family: inherit; }
+    .btn-reset:hover { background: rgba(255,255,255,0.12); }
+
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; display: none; }
+
+    .preview-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 12px 16px; margin-top: 14px; }
+    .preview-box .preview-title { font-size: 10px; color: rgba(255,255,255,0.3); margin-bottom: 8px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .preview-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .preview-chip { background: rgba(255,255,255,0.06); border-radius: 4px; padding: 4px 10px; font-size: 12px; color: rgba(255,255,255,0.7); }
+  </style>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E"></script>
+</head>
+<body>
+
+<header>
+  <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
+  <div>
+    <h1>⏱ 時間管理設定</h1>
+    <p>荷下ろし・積み込み時間の段階設定、移動速度などを管理します</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- 基本設定 -->
+  <div class="section">
+    <div class="section-title">🚗 基本設定</div>
+    <div class="card">
+      <div class="basic-grid" style="grid-template-columns:1fr;">
+        <div class="form-group">
+          <label>店舗間の平均移動速度（km/h）※直線距離換算。実際は20〜25km/h推奨</label>
+          <input type="number" id="speed" value="25" min="5" max="80" style="max-width:200px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 荷下ろし時間 -->
+  <div class="section">
+    <div class="section-title">📦 荷下ろし時間（個数による段階設定）</div>
+    <div class="card">
+      <p class="table-desc">
+        納品個数の範囲ごとに荷下ろし時間を設定します。<br>
+        例：1〜10個 → 5分、11〜20個 → 10分、21個以上 → 15分
+      </p>
+      <table class="step-table" id="unload-table">
+        <thead>
+          <tr>
+            <th style="width:80px;">個数（下限）</th>
+            <th style="width:16px;"></th>
+            <th style="width:80px;">個数（上限）</th>
+            <th style="width:90px;">時間（分）</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="unload-tbody"></tbody>
+      </table>
+      <button class="btn-add" onclick="addRow('unload')">＋ 行を追加</button>
+      <div class="preview-box">
+        <div class="preview-title">プレビュー</div>
+        <div class="preview-row" id="unload-preview"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 積み込み時間 -->
+  <div class="section">
+    <div class="section-title">🏭 積み込み時間（個数による段階設定）</div>
+    <div class="card">
+      <p class="table-desc">
+        1便あたりの積み込み総個数の範囲ごとに積み込み時間を設定します。<br>
+        例：1〜100個 → 15分、101〜200個 → 25分、201個以上 → 35分
+      </p>
+      <table class="step-table" id="load-table">
+        <thead>
+          <tr>
+            <th style="width:80px;">個数（下限）</th>
+            <th style="width:16px;"></th>
+            <th style="width:80px;">個数（上限）</th>
+            <th style="width:90px;">時間（分）</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="load-tbody"></tbody>
+      </table>
+      <button class="btn-add" onclick="addRow('load')">＋ 行を追加</button>
+      <div class="preview-box">
+        <div class="preview-title">プレビュー</div>
+        <div class="preview-row" id="load-preview"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-save" onclick="saveSettings()">💾 保存</button>
+    <button class="btn-reset" onclick="resetDefaults()">デフォルトに戻す</button>
+  </div>
+
+  <!-- 移動時間キャッシュ -->
+  <div class="section" style="margin-top:32px;">
+    <div class="section-title">🗺 移動時間の事前取得</div>
+    <div class="card">
+      <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;margin-bottom:14px;">
+        Google Maps APIを使って、各デポから全店舗までの<b>実際の道路所要時間</b>を取得・保存します。<br>
+        店舗が増えたり変更したときに押してください。一度保存すれば毎回取得する必要はありません。
+      </p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button id="fetch-btn" onclick="fetchAllTravelTimes()"
+          style="background:rgba(6,182,212,0.2);border:1px solid rgba(6,182,212,0.4);color:#06b6d4;padding:9px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:700;">
+          🕐 移動時間を一括取得
+        </button>
+        <span id="fetch-status" style="font-size:12px;color:rgba(255,255,255,0.4);"></span>
+      </div>
+      <div id="fetch-progress" style="margin-top:10px;display:none;">
+        <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:6px;overflow:hidden;">
+          <div id="fetch-bar" style="height:100%;background:#06b6d4;border-radius:4px;width:0%;transition:width 0.3s;"></div>
+        </div>
+      </div>
+      <div id="cache-info" style="margin-top:10px;font-size:11px;color:rgba(255,255,255,0.3);"></div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'haisha_time_settings';
+
+const DEFAULTS = {
+  speed: 25,
+  unloadSteps: [
+    { from: 1,   to: 10,  min: 5  },
+    { from: 11,  to: 20,  min: 8  },
+    { from: 21,  to: 50,  min: 12 },
+    { from: 51,  to: 999, min: 18 },
+  ],
+  loadSteps: [
+    { from: 1,   to: 100, min: 15 },
+    { from: 101, to: 200, min: 25 },
+    { from: 201, to: 999, min: 35 },
+  ],
+};
+
+let settings = JSON.parse(JSON.stringify(DEFAULTS));
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) settings = JSON.parse(saved);
+  } catch(e) {}
+}
+
+function saveSettings() {
+  settings.speed = Number(document.getElementById('speed').value) || 25;
+  settings.unloadSteps = readRows('unload');
+  settings.loadSteps   = readRows('load');
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  showToast('保存しました');
+  updatePreviews();
+}
+
+function resetDefaults() {
+  if (!confirm('デフォルト設定に戻しますか？')) return;
+  settings = JSON.parse(JSON.stringify(DEFAULTS));
+  applyToForm();
+  showToast('デフォルトに戻しました');
+}
+
+function readRows(type) {
+  const rows = document.querySelectorAll(`#${type}-tbody tr`);
+  const steps = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const from = Number(inputs[0].value);
+    const to   = Number(inputs[1].value);
+    const min  = Number(inputs[2].value);
+    if (from > 0 && to >= from && min > 0) steps.push({ from, to, min });
+  });
+  return steps.sort((a, b) => a.from - b.from);
+}
+
+function renderRows(type, steps) {
+  const tbody = document.getElementById(`${type}-tbody`);
+  tbody.innerHTML = '';
+  steps.forEach((step, i) => {
+    addRowWithData(type, step.from, step.to, step.min);
+  });
+  updatePreviews();
+}
+
+function addRow(type) {
+  const steps = readRows(type);
+  const lastTo = steps.length > 0 ? steps[steps.length - 1].to : 0;
+  const lastMin = steps.length > 0 ? steps[steps.length - 1].min : 5;
+  addRowWithData(type, lastTo + 1, lastTo + 10, lastMin + 5);
+  updatePreviews();
+}
+
+function addRowWithData(type, from, to, min) {
+  const tbody = document.getElementById(`${type}-tbody`);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="number" value="${from}" min="1" oninput="updatePreviews()"></td>
+    <td class="range-sep">〜</td>
+    <td><input type="number" value="${to}" min="1" oninput="updatePreviews()"></td>
+    <td><input type="number" value="${min}" min="1" oninput="updatePreviews()"> <span class="unit">分</span></td>
+    <td><button class="btn-del" onclick="delRow(this)">削除</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function delRow(btn) {
+  btn.closest('tr').remove();
+  updatePreviews();
+}
+
+function updatePreviews() {
+  ['unload', 'load'].forEach(type => {
+    const steps = readRows(type);
+    const el = document.getElementById(`${type}-preview`);
+    if (steps.length === 0) { el.innerHTML = '<span style="color:rgba(255,255,255,0.2);font-size:12px;">設定なし</span>'; return; }
+    el.innerHTML = steps.map(s =>
+      `<div class="preview-chip">${s.from}〜${s.to}個 → ${s.min}分</div>`
+    ).join('');
+  });
+}
+
+function applyToForm() {
+  document.getElementById('speed').value = settings.speed || 25;
+  renderRows('unload', settings.unloadSteps);
+  renderRows('load',   settings.loadSteps);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+loadSettings();
+applyToForm();
+showCacheInfo();
+
+// ====================================================
+// 移動時間キャッシュ（Google Distance Matrix API）
+// ====================================================
+const MAPS_KEY_DM = 'AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E';
+const DEPOT_ORIGINS = {
+  '2806': { lat: 34.6717, lng: 135.1919 }, // 神戸西デポ
+  '2805': { lat: 35.1780, lng: 135.0270 }, // 丹波デポ
+};
+const TRAVEL_CACHE_KEY = 'haisha_travel_cache';
+
+function showCacheInfo() {
+  try {
+    const cache = JSON.parse(localStorage.getItem(TRAVEL_CACHE_KEY) || '{}');
+    const keys = Object.keys(cache);
+    const el = document.getElementById('cache-info');
+    if (!el) return;
+    if (keys.length === 0) {
+      el.textContent = 'まだ取得していません';
+    } else {
+      const dates = Object.values(cache).map(v => v.updated).filter(Boolean).sort().reverse();
+      const last = dates[0] ? new Date(dates[0]).toLocaleString('ja-JP') : '不明';
+      el.textContent = `保存済み: ${keys.length}件 ／ 最終取得: ${last}`;
+    }
+  } catch(e) {}
+}
+
+async function fetchAllTravelTimes() {
+  const btn = document.getElementById('fetch-btn');
+  const statusEl = document.getElementById('fetch-status');
+  const progressEl = document.getElementById('fetch-progress');
+  const barEl = document.getElementById('fetch-bar');
+
+  if (!window.google || !window.google.maps) {
+    statusEl.textContent = 'Google Mapsの読み込み中です。少し待ってから再試行してください。';
+    return;
+  }
+
+  const stores = (() => { try { return JSON.parse(localStorage.getItem('haisha_stores') || '{}'); } catch(e) { return {}; } })();
+  const codes = Object.keys(stores);
+  if (codes.length === 0) { statusEl.textContent = '店舗データがありません。CSVを先に読み込んでください。'; return; }
+
+  btn.disabled = true; btn.style.opacity = '0.5';
+  progressEl.style.display = 'block';
+
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(TRAVEL_CACHE_KEY) || '{}'); } catch(e) {}
+
+  const byDepot = { '2806': [], '2805': [] };
+  codes.forEach(code => {
+    const s = stores[code];
+    if (!s.lat || !s.lng) return;
+    const rawDepot = s.depot || '2806';
+    const dCode = rawDepot === 'kobe' ? '2806' : rawDepot === 'tamba' ? '2805' : rawDepot;
+    if (byDepot[dCode]) byDepot[dCode].push({ code, lat: s.lat, lng: s.lng });
+  });
+
+  const service = new google.maps.DistanceMatrixService();
+  const BATCH = 25;
+  const total = Object.values(byDepot).reduce((s, a) => s + a.length, 0);
+  let done = 0;
+
+  for (const [depotCode, shopList] of Object.entries(byDepot)) {
+    if (shopList.length === 0) continue;
+    const origin = DEPOT_ORIGINS[depotCode];
+    const originLatLng = new google.maps.LatLng(origin.lat, origin.lng);
+
+    for (let i = 0; i < shopList.length; i += BATCH) {
+      const batch = shopList.slice(i, i + BATCH);
+      const destinations = batch.map(s => new google.maps.LatLng(s.lat, s.lng));
+
+      await new Promise((resolve) => {
+        service.getDistanceMatrix({
+          origins: [originLatLng],
+          destinations: destinations,
+          travelMode: google.maps.TravelMode.DRIVING,
+        }, (response, status) => {
+          if (status === 'OK' && response.rows[0]) {
+            response.rows[0].elements.forEach((el, j) => {
+              if (el.status === 'OK') {
+                cache[batch[j].code] = {
+                  duration_sec: el.duration.value,
+                  distance_m: el.distance.value,
+                  depot: depotCode,
+                  updated: new Date().toISOString(),
+                };
+              }
+            });
+          } else {
+            console.warn('DistanceMatrix error:', status);
+            statusEl.textContent = `APIエラー: ${status}`;
+          }
+          done += batch.length;
+          const pct = Math.round(done / total * 100);
+          barEl.style.width = pct + '%';
+          statusEl.textContent = `取得中... ${done}/${total}件`;
+          resolve();
+        });
+      });
+      await new Promise(r => setTimeout(r, 200)); // APIレート制限対策
+    }
+  }
+
+  localStorage.setItem(TRAVEL_CACHE_KEY, JSON.stringify(cache));
+  btn.disabled = false; btn.style.opacity = '1';
+  const cached = Object.keys(cache).length;
+  statusEl.textContent = `✅ ${cached}件の移動時間を保存しました`;
+  showCacheInfo();
+}
+</script>
+</body>
+</html>

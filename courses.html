@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配送コース管理 | 配車管理システム</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
+    }
+    header { padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 16px; }
+    .back-btn { background: rgba(255,255,255,0.08); border: none; color: white; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+    .back-btn:hover { background: rgba(255,255,255,0.15); }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    main { max-width: 900px; margin: 0 auto; padding: 24px 32px 60px; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .section-title { font-size: 11px; letter-spacing: 0.15em; color: #f59e0b; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; }
+
+    /* コース一覧 */
+    .course-list { display: flex; flex-direction: column; gap: 6px; max-height: 600px; overflow-y: auto; }
+    .course-row {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 10px 14px;
+      display: flex; align-items: center; gap: 12px;
+      border-left: 3px solid #f59e0b;
+    }
+    .course-num { font-size: 16px; font-weight: 700; color: #f59e0b; min-width: 36px; font-family: monospace; }
+    .course-name { flex: 1; font-size: 14px; color: rgba(255,255,255,0.8); }
+    .course-name.empty { color: rgba(255,255,255,0.3); font-style: italic; }
+    .course-actions { display: flex; gap: 6px; }
+    .btn-edit { background: rgba(255,255,255,0.08); border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .btn-edit:hover { background: rgba(255,255,255,0.15); }
+    .btn-del { background: rgba(239,68,68,0.12); border: none; color: #f87171; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .btn-del:hover { background: rgba(239,68,68,0.22); }
+
+    /* フォーム */
+    .add-form { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+    .add-form h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: rgba(255,255,255,0.8); }
+    .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); }
+    .form-group input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit; }
+    .form-group input:focus { outline: none; border-color: #f59e0b; }
+    .form-group input::placeholder { color: rgba(255,255,255,0.2); }
+    .form-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .btn-add { background: #f59e0b; color: #000; border: none; padding: 9px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 700; }
+    .btn-add:hover { background: #d97706; }
+    .btn-clr { background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.5); padding: 9px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+    .btn-clr:hover { background: rgba(255,255,255,0.12); }
+
+    .empty-msg { font-size: 13px; color: rgba(255,255,255,0.25); padding: 24px; text-align: center; }
+  .depot-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 700; flex-shrink: 0; }
+  .badge-kobe  { background: rgba(6,182,212,0.2); color: #06b6d4; }
+  .badge-tamba { background: rgba(167,139,250,0.2); color: #a78bfa; }
+  .form-group select {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+  }
+  .form-group select:focus { outline: none; border-color: #f59e0b; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; display: none; }
+
+    /* CSVインポートボタン */
+    .import-btn { background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3); color: #06b6d4; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; margin-bottom: 12px; }
+    .import-btn:hover { background: rgba(6,182,212,0.25); }
+  </style>
+</head>
+<body>
+
+<header>
+  <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
+  <div>
+    <h1>🛣 配送コース管理</h1>
+    <p>コース番号と名称を管理します</p>
+  </div>
+</header>
+
+<main>
+  <div class="layout">
+    <!-- 左：一覧 -->
+    <div>
+      <div class="section-title">登録済みコース</div>
+      <button class="import-btn" onclick="importFromStores()">📥 CSVから自動取得</button>
+      <div class="course-list" id="course-list">
+        <div class="empty-msg">コースが登録されていません</div>
+      </div>
+    </div>
+
+    <!-- 右：フォーム -->
+    <div>
+      <div class="section-title">コースを追加・編集</div>
+      <div class="add-form">
+        <h3 id="form-title" data-edit-num="">新規登録</h3>
+        <div class="form-group">
+          <label>コース番号 *（例：01）</label>
+          <input type="text" id="new-num" placeholder="例：01">
+        </div>
+        <div class="form-group">
+          <label>コース名称（省略可）</label>
+          <input type="text" id="new-name" placeholder="例：姫路エリア">
+        </div>
+        <div class="form-group">
+          <label>担当デポ</label>
+          <select id="new-depot" style="background:#1e2d3d;">
+            <option value="" style="background:#1e2d3d;">-- 未設定 --</option>
+            <option value="2806" style="background:#1e2d3d;">🏭 神戸西デポ（2806）</option>
+            <option value="2805" style="background:#1e2d3d;">🏭 丹波デポ（2805）</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button class="btn-add" onclick="saveCourse()">＋ 登録</button>
+          <button class="btn-clr" onclick="clearForm()">クリア</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'haisha_courses';
+// 形式: { '01': { name:'姫路エリア', depot:'2806' } }
+// 旧形式( { '01': '姫路エリア' } )は読み込み時に自動変換
+let courses = {};
+
+function loadCourses() {
+  try {
+    const d = localStorage.getItem(STORAGE_KEY);
+    if (d) {
+      const raw = JSON.parse(d);
+      Object.keys(raw).forEach(k => {
+        if (typeof raw[k] === 'string') {
+          raw[k] = { name: raw[k], depot: '' };
+        }
+        if (!raw[k].depot) raw[k].depot = '';
+      });
+      courses = raw;
+    }
+  } catch(e) { courses = {}; }
+}
+
+function saveCourses() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
+}
+
+function getCourseName(num) {
+  const c = courses[num];
+  if (!c) return '';
+  return typeof c === 'string' ? c : (c.name || '');
+}
+function getCourseDepot(num) {
+  const c = courses[num];
+  if (!c) return '';
+  return typeof c === 'string' ? '' : (c.depot || '');
+}
+
+function renderList() {
+  const el = document.getElementById('course-list');
+  const nums = Object.keys(courses).sort();
+  if (nums.length === 0) {
+    el.innerHTML = '<div class="empty-msg">コースが登録されていません</div>';
+    return;
+  }
+  el.innerHTML = '';
+  nums.forEach(num => {
+    const name  = getCourseName(num);
+    const depot = getCourseDepot(num);
+    const depotLabel = depot === '2806' ? '🏭神戸西' : depot === '2805' ? '🏭丹波' : '';
+    const depotClass = depot === '2806' ? 'badge-kobe' : depot === '2805' ? 'badge-tamba' : '';
+    const row = document.createElement('div');
+    row.className = 'course-row';
+    row.innerHTML = `
+      <div class="course-num">${num}</div>
+      <div class="course-name ${name ? '' : 'empty'}">${name || '（名称未設定）'}</div>
+      ${depotLabel ? `<span class="depot-badge ${depotClass}">${depotLabel}</span>` : ''}
+      <div class="course-actions">
+        <button class="btn-edit" onclick="editCourse('${num}')">編集</button>
+        <button class="btn-del" onclick="deleteCourse('${num}')">削除</button>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function saveCourse() {
+  const num   = document.getElementById('new-num').value.trim();
+  const name  = document.getElementById('new-name').value.trim();
+  const depot = document.getElementById('new-depot') ? document.getElementById('new-depot').value : '';
+  if (!num) { alert('コース番号は必須です'); return; }
+
+  const editNum = document.getElementById('form-title').dataset.editNum;
+  if (editNum && editNum !== num) {
+    delete courses[editNum];
+  }
+  courses[num] = { name: name, depot: depot };
+  saveCourses();
+  renderList();
+  clearForm();
+  showToast(num + (name ? ' (' + name + ')' : '') + ' を保存しました');
+}
+
+function editCourse(num) {
+  document.getElementById('new-num').value  = num;
+  document.getElementById('new-name').value = getCourseName(num);
+  const depotEl = document.getElementById('new-depot');
+  if (depotEl) depotEl.value = getCourseDepot(num);
+  document.getElementById('form-title').textContent  = '編集: ' + num;
+  document.getElementById('form-title').dataset.editNum = num;
+}
+
+function deleteCourse(num) {
+  if (!confirm('コース「' + num + '」を削除しますか？')) return;
+  delete courses[num];
+  saveCourses();
+  renderList();
+  showToast('削除しました');
+}
+
+function clearForm() {
+  document.getElementById('new-num').value  = '';
+  document.getElementById('new-name').value = '';
+  const depotEl = document.getElementById('new-depot');
+  if (depotEl) depotEl.value = '';
+  document.getElementById('form-title').textContent = '新規登録';
+  document.getElementById('form-title').dataset.editNum = '';
+}
+
+// 店舗データからコース番号・デポを自動取得
+function importFromStores() {
+  try {
+    const storeData = JSON.parse(localStorage.getItem('haisha_stores') || '{}');
+    const found = new Set();
+    const courseDepotMap = {};
+    Object.values(storeData).forEach(s => {
+      if (s.course && s.course.trim()) {
+        found.add(s.course.trim());
+        if (s.depot) courseDepotMap[s.course.trim()] = s.depot;
+      }
+    });
+    if (found.size === 0) {
+      alert('店舗データにコース番号が見つかりません。\nCSVを読み込んでから再試行してください。');
+      return;
+    }
+    let added = 0;
+    found.forEach(num => {
+      if (!courses[num]) {
+        courses[num] = { name: '', depot: courseDepotMap[num] || '' };
+        added++;
+      } else {
+        // 既存でデポ未設定なら補完
+        if (!getCourseDepot(num) && courseDepotMap[num]) {
+          courses[num].depot = courseDepotMap[num];
+        }
+      }
+    });
+    saveCourses();
+    renderList();
+    showToast(added + '件のコースを取得しました');
+  } catch(e) {
+    alert('取得に失敗しました: ' + e.message);
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+loadCourses();
+renderList();
+</script>
+</body>
+</html>

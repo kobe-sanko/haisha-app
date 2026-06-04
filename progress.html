@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配送進捗確認</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
+
+    #header {
+      background: #161f2c; border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 16px; position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    #header h1 { font-size: 16px; font-weight: 700; }
+    #header .sub { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .back-btn { background: rgba(255,255,255,0.08); border: none; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .back-btn:hover { background: rgba(255,255,255,0.15); }
+    #live-badge { background: #10b981; color: white; font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 20px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    /* タブ */
+    .tab-bar { display: flex; background: #161f2c; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 0 12px; }
+    .tab-btn { padding: 10px 20px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.4); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab-btn.active { color: #f59e0b; border-bottom-color: #f59e0b; }
+    .tab-btn:hover { color: rgba(255,255,255,0.8); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* サマリー */
+    #summary-bar {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 8px; padding: 12px; background: #161f2c;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .summary-item { text-align: center; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px 6px; }
+    .summary-item .val { font-size: 20px; font-weight: 700; color: white; }
+    .summary-item .lbl { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    /* 進捗タブ */
+    #driver-list { padding: 10px 12px 80px; }
+    .driver-card { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+    .driver-card-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; }
+    .driver-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: white; flex-shrink: 0; }
+    .driver-info { flex: 1; }
+    .driver-name { font-size: 14px; font-weight: 700; color: white; }
+    .driver-meta { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .driver-counts { text-align: right; }
+    .count-done { font-size: 18px; font-weight: 700; color: #10b981; }
+    .count-total { font-size: 12px; color: rgba(255,255,255,0.4); }
+    .progress-bar-wrap { padding: 0 14px 12px; }
+    .progress-bar-bg { background: rgba(255,255,255,0.08); border-radius: 4px; height: 6px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 3px; }
+    .stop-list { border-top: 1px solid rgba(255,255,255,0.06); }
+    .stop-item { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
+    .stop-item:last-child { border-bottom: none; }
+    .stop-status { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+    .stop-status.done { background: #10b981; color: white; }
+    .stop-status.pending { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
+    .stop-name { flex: 1; color: rgba(255,255,255,0.8); }
+    .stop-time { font-size: 10px; color: #10b981; }
+    .toggle-btn { width: 100%; padding: 7px; border: none; background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.3); font-size: 11px; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.06); }
+    .toggle-btn:hover { background: rgba(255,255,255,0.06); }
+
+    /* ガントチャートタブ */
+    #gantt-wrap { padding: 12px; }
+    .gantt-settings {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 14px; margin-bottom: 12px;
+    }
+    .gantt-settings h3 { font-size: 12px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+    .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .setting-item label { font-size: 11px; color: rgba(255,255,255,0.5); display: block; margin-bottom: 4px; }
+    .setting-item input {
+      width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: white; border-radius: 5px; padding: 5px 8px; font-size: 12px;
+    }
+    .setting-item input:focus { outline: none; border-color: #f59e0b; }
+    .btn-calc {
+      margin-top: 10px; background: #f59e0b; color: #000; border: none;
+      padding: 8px 20px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .btn-calc:hover { background: #d97706; }
+
+    /* ガント本体 */
+    .gantt-chart {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; overflow: hidden;
+    }
+    .gantt-header {
+      display: flex; border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04); position: sticky; top: 0; z-index: 10;
+    }
+    .gantt-name-col { width: 110px; flex-shrink: 0; padding: 8px 10px; font-size: 11px; color: rgba(255,255,255,0.4); border-right: 1px solid rgba(255,255,255,0.08); }
+    .gantt-time-area { flex: 1; overflow-x: auto; }
+    .gantt-time-labels { display: flex; min-width: 100%; }
+    .gantt-time-label { font-size: 10px; color: rgba(255,255,255,0.3); padding: 8px 0; text-align: center; border-right: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
+
+    .gantt-row { display: flex; border-bottom: 1px solid rgba(255,255,255,0.05); min-height: 44px; }
+    .gantt-row:last-child { border-bottom: none; }
+    .gantt-driver-name {
+      width: 110px; flex-shrink: 0; padding: 6px 10px;
+      font-size: 12px; font-weight: 700; color: white;
+      border-right: 1px solid rgba(255,255,255,0.08);
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .gantt-driver-sub { font-size: 10px; color: rgba(255,255,255,0.3); font-weight: 400; margin-top: 1px; }
+    .gantt-bars { flex: 1; position: relative; overflow-x: auto; }
+    .gantt-bars-inner { position: relative; height: 44px; }
+    .gantt-grid-line { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.04); }
+
+    .gantt-bar {
+      position: absolute; top: 8px; height: 28px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700; color: white;
+      overflow: hidden; white-space: nowrap;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .gantt-bar:hover { opacity: 0.8; }
+    .gantt-bar.bin1 { opacity: 1; }
+    .gantt-bar.bin2 { opacity: 0.75; border: 1px solid rgba(255,255,255,0.2); }
+    .gantt-bar.loading { background: rgba(255,255,255,0.15) !important; }
+    .gantt-bar.travel { opacity: 0.4; }
+    .gantt-bar.depot-return { background: rgba(255,255,255,0.1) !important; border: 1px dashed rgba(255,255,255,0.2); }
+
+    .gantt-tooltip {
+      position: fixed; background: #1e2d3d; border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; padding: 10px 14px; font-size: 12px; color: white;
+      pointer-events: none; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      max-width: 220px;
+    }
+    .gantt-tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
+    .gantt-tooltip .tt-row { color: rgba(255,255,255,0.6); margin-top: 2px; }
+
+    .gantt-legend {
+      display: flex; gap: 12px; padding: 10px 12px;
+      border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: rgba(255,255,255,0.4); }
+    .legend-dot { width: 12px; height: 12px; border-radius: 2px; }
+
+    #loading { text-align: center; padding: 60px 20px; color: rgba(255,255,255,0.3); font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
+    <div>
+      <h1>📊 配送進捗確認</h1>
+      <div class="sub" id="header-sub">読み込み中...</div>
+    </div>
+  </div>
+  <div id="live-badge">● LIVE</div>
+</div>
+
+<div id="summary-bar">
+  <div class="summary-item"><div class="val" id="sum-drivers">-</div><div class="lbl">稼働人数</div></div>
+  <div class="summary-item"><div class="val" id="sum-total">-</div><div class="lbl">総件数</div></div>
+  <div class="summary-item"><div class="val" id="sum-done" style="color:#10b981;">-</div><div class="lbl">完了</div></div>
+  <div class="summary-item"><div class="val" id="sum-remain" style="color:#f87171;">-</div><div class="lbl">残り</div></div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('progress')">📋 進捗</button>
+  <button class="tab-btn" onclick="switchTab('gantt')">📅 時間帯</button>
+</div>
+
+<!-- 進捗タブ -->
+<div id="tab-progress" class="tab-content active">
+  <div id="loading">読み込み中...</div>
+  <div id="driver-list"></div>
+</div>
+
+<!-- ガントチャートタブ -->
+<div id="tab-gantt" class="tab-content">
+  <div id="gantt-wrap">
+    <div class="gantt-settings">
+      <h3>⚙️ 時間設定</h3>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>出発時刻</label>
+          <input type="time" id="s-depart" value="07:00">
+        </div>
+        <div class="setting-item">
+          <label>平均速度（km/h）</label>
+          <input type="number" id="s-speed" value="40" min="10" max="100">
+        </div>
+        <div class="setting-item">
+          <label>荷下ろし 基本（分/店）</label>
+          <input type="number" id="s-unload-base" value="5" min="1" max="60">
+        </div>
+        <div class="setting-item">
+          <label>荷下ろし 追加（分/10個）</label>
+          <input type="number" id="s-unload-per10" value="1" min="0" max="30">
+        </div>
+        <div class="setting-item">
+          <label>積み込み（分/100個）</label>
+          <input type="number" id="s-load-per100" value="15" min="1" max="60">
+        </div>
+        <div class="setting-item">
+          <label>デポ間距離（km）※往復</label>
+          <input type="number" id="s-depot-dist" value="0" min="0" max="200">
+        </div>
+      </div>
+      <button class="btn-calc" onclick="buildGantt()">📅 計算して表示</button>
+    </div>
+    <div id="gantt-container"></div>
+  </div>
+</div>
+
+<div class="gantt-tooltip" id="tooltip" style="display:none;"></div>
+
+<script>
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#e91e63','#00bcd4','#ff5722','#607d8b'];
+const DEPOT_COORDS = { kobe: { lat: 34.69, lng: 135.19 }, tamba: { lat: 35.18, lng: 135.03 } };
+
+let deliveryId = null, allStops = [], expandedDrivers = {};
+
+// ============ タブ切り替え ============
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['progress','gantt'][i] === name));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'gantt' && allStops.length > 0) buildGantt();
+}
+
+// ============ 初期化 ============
+async function init() {
+  const { data: deliveries } = await sbClient.from('deliveries').select('*').order('created_at',{ascending:false}).limit(1);
+  if (!deliveries || deliveries.length === 0) { document.getElementById('loading').textContent = '配車データがありません'; return; }
+  const del = deliveries[0];
+  deliveryId = del.id;
+  const ds = del.delivery_date || '';
+  if (ds.length === 8) {
+    const y=ds.slice(0,4),m=parseInt(ds.slice(4,6)),d=parseInt(ds.slice(6,8));
+    document.getElementById('header-sub').textContent = `${y}年${m}月${d}日（${'日月火水木金土'[new Date(+y,m-1,d).getDay()]}）`;
+  }
+  await loadStops();
+  setupRealtime();
+}
+
+async function loadStops() {
+  const { data } = await sbClient.from('delivery_stops').select('*').eq('delivery_id', deliveryId).order('stop_order');
+  allStops = (data || []).filter(s => s.driver_name);
+  document.getElementById('loading').style.display = 'none';
+  renderProgress();
+}
+
+// ============ 進捗タブ ============
+function renderProgress() {
+  const driverMap = {};
+  allStops.forEach(s => { if (!driverMap[s.driver_name]) driverMap[s.driver_name] = []; driverMap[s.driver_name].push(s); });
+  const drivers = Object.entries(driverMap).sort((a,b) => a[0].localeCompare(b[0]));
+  const total = allStops.length, done = allStops.filter(s => s.status === 'completed').length;
+  document.getElementById('sum-drivers').textContent = drivers.length;
+  document.getElementById('sum-total').textContent = total;
+  document.getElementById('sum-done').textContent = done;
+  document.getElementById('sum-remain').textContent = total - done;
+
+  const list = document.getElementById('driver-list');
+  list.innerHTML = '';
+  drivers.forEach(([name, stops], idx) => {
+    const color = COLORS[idx % COLORS.length];
+    const doneCount = stops.filter(s => s.status === 'completed').length;
+    const pct = stops.length > 0 ? Math.round(doneCount / stops.length * 100) : 0;
+    const isExp = expandedDrivers[name] || false;
+    const stopsHtml = stops.map(s => {
+      const isDone = s.status === 'completed';
+      const t = isDone && s.completed_at ? new Date(s.completed_at).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) : null;
+      return `<div class="stop-item"><div class="stop-status ${isDone?'done':'pending'}">${isDone?'✓':s.stop_order}</div><div class="stop-name">${s.name}</div>${t?`<div class="stop-time">${t}</div>`:''}</div>`;
+    }).join('');
+    const card = document.createElement('div');
+    card.className = 'driver-card';
+    card.innerHTML = `
+      <div class="driver-card-header">
+        <div class="driver-avatar" style="background:${color}">${name.slice(-1)}</div>
+        <div class="driver-info"><div class="driver-name">${name}</div><div class="driver-meta">${stops.length}件 / ${stops.reduce((s,x)=>s+(Number(x.items)||0),0)}個</div></div>
+        <div class="driver-counts"><div class="count-done">${doneCount}</div><div class="count-total">/ ${stops.length}件</div></div>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+        <div class="progress-label"><span>完了率 ${pct}%</span><span>残り ${stops.length - doneCount}件</span></div>
+      </div>
+      <div class="stop-list" style="display:${isExp?'block':'none'}">${stopsHtml}</div>
+      <button class="toggle-btn" onclick="toggleDriver('${name}')">${isExp ? '▲ 閉じる' : '▼ 配送先を見る（' + stops.length + '件）'}</button>`;
+    list.appendChild(card);
+  });
+}
+
+function toggleDriver(name) { expandedDrivers[name] = !expandedDrivers[name]; renderProgress(); }
+
+// ============ ガントチャート ============
+function calcDist(a, b) {
+  const R = 111, dlat = (b.lat - a.lat) * R, dlng = (b.lng - a.lng) * R * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+  return Math.sqrt(dlat * dlat + dlng * dlng);
+}
+
+// 移動時間キャッシュを読み込む
+function loadTravelCache() {
+  try { return JSON.parse(localStorage.getItem('haisha_travel_cache') || '{}'); } catch(e) { return {}; }
+}
+
+// キャッシュから所要時間（分）を取得。なければ直線距離で計算
+function getTravelMin(fromLoc, toLoc, travelCache, speed, storeCode) {
+  // デポ→店舗の場合はキャッシュを使用
+  if (storeCode && travelCache[storeCode]) {
+    return Math.ceil(travelCache[storeCode].duration_sec / 60);
+  }
+  // キャッシュなしは直線距離
+  const dist = calcDist(fromLoc, toLoc);
+  return Math.ceil(dist / speed * 60);
+}
+
+function timeToMin(str) {
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minToStr(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function buildGantt() {
+  const departMin  = timeToMin(document.getElementById('s-depart').value);
+  const speed      = Number(document.getElementById('s-speed').value) || 40;
+  const unloadBase = Number(document.getElementById('s-unload-base').value) || 5;
+  const unloadPer10 = Number(document.getElementById('s-unload-per10').value) || 1;
+  const loadPer100 = Number(document.getElementById('s-load-per100').value) || 15;
+
+  // localStorageからドライバー・店舗・割当データを取得
+  const drivers = JSON.parse(localStorage.getItem('haisha_drivers') || '[]');
+  const storeMap = JSON.parse(localStorage.getItem('haisha_stores') || '{}');
+  const locsRaw  = JSON.parse(sessionStorage.getItem('haisha_locations') || '[]');
+  const asgnRaw  = JSON.parse(sessionStorage.getItem('haisha_assignments') || '{}');
+
+  if (locsRaw.length === 0) {
+    document.getElementById('gantt-container').innerHTML = '<p style="color:rgba(255,255,255,0.3);padding:20px;text-align:center;">配車管理画面でCSVを読み込んで配車割り当てを行ってください</p>';
+    return;
+  }
+
+  // 移動時間キャッシュ読み込み
+  const travelCache = loadTravelCache();
+  const hasCacheData = Object.keys(travelCache).length > 0;
+
+  // 時間管理設定読み込み（stores.htmlの段階設定）
+  let timeSetting = null;
+  try { timeSetting = JSON.parse(localStorage.getItem('haisha_time_settings')); } catch(e) {}
+
+  // 段階設定から時間を求める関数
+  function getStepMin(items, steps, fallback) {
+    if (!steps || steps.length === 0) return fallback;
+    const n = Number(items) || 0;
+    for (const step of steps) {
+      if (n >= step.from && n <= step.to) return step.min;
+    }
+    // 範囲外は最大値を使う
+    return steps[steps.length - 1].min;
+  }
+
+  // ドライバーごとに1便・2便の店舗リストを構築
+  const driverSchedules = {};
+  Object.entries(asgnRaw).forEach(([i, asgn]) => {
+    const loc = locsRaw[Number(i)];
+    if (!loc || !asgn) return;
+    const did = asgn.driverId, bin = asgn.bin || 1;
+    if (!driverSchedules[did]) driverSchedules[did] = { bin1: [], bin2: [] };
+    (bin === 1 ? driverSchedules[did].bin1 : driverSchedules[did].bin2).push(loc);
+  });
+
+  // 時系列計算
+  const schedules = [];
+  Object.entries(driverSchedules).forEach(([did, bins]) => {
+    const driver = drivers.find(d => String(d.id) === String(did));
+    if (!driver) return;
+    const depotKey = driver.depot === 'tamba' ? 'tamba' : 'kobe';
+    const depot = DEPOT_COORDS[depotKey];
+    const depotCode = depotKey === 'tamba' ? '2805' : '2806';
+    const events = [];
+    let cur = { ...depot }, curMin = departMin;
+    let isFirstStop = true;
+
+    ['bin1', 'bin2'].forEach((binKey, binIdx) => {
+      const stops = bins[binKey];
+      if (!stops || stops.length === 0) return;
+      const binNum = binIdx + 1;
+      const totalItems = stops.reduce((s, l) => s + (Number(l.items) || 0), 0);
+
+      // 積み込み時間（段階設定 or フォームの値）
+      const loadMin = timeSetting
+        ? getStepMin(totalItems, timeSetting.loadSteps, Math.ceil(totalItems / 100 * loadPer100))
+        : Math.ceil(totalItems / 100 * loadPer100);
+      if (loadMin > 0) {
+        events.push({ type: 'load', bin: binNum, start: curMin, dur: loadMin, label: `積み込み ${totalItems}個`, items: totalItems });
+        curMin += loadMin;
+      }
+
+      // デポ出発→各店舗
+      stops.forEach(loc => {
+        if (!loc.lat || !loc.lng) return;
+        let travelMin;
+        if (isFirstStop && hasCacheData) {
+          // デポ→最初の店舗はキャッシュを使用
+          travelMin = getTravelMin(cur, { lat: loc.lat, lng: loc.lng }, travelCache, speed, loc.code);
+        } else {
+          // 店舗→店舗は直線距離
+          const dist = calcDist(cur, { lat: loc.lat, lng: loc.lng });
+          travelMin = Math.ceil(dist / speed * 60);
+        }
+        isFirstStop = false;
+        if (travelMin > 0) {
+          events.push({ type: 'travel', bin: binNum, start: curMin, dur: travelMin, label: '移動' });
+          curMin += travelMin;
+        }
+        const items = Number(loc.items) || 0;
+        // 荷下ろし時間（段階設定 or フォームの値）
+        const unloadMin = timeSetting
+          ? getStepMin(items, timeSetting.unloadSteps, unloadBase + Math.ceil(items / 10) * unloadPer10)
+          : (unloadBase + Math.ceil(items / 10) * unloadPer10);
+        events.push({ type: 'unload', bin: binNum, start: curMin, dur: unloadMin, label: loc.name, items });
+        curMin += unloadMin;
+        cur = { lat: loc.lat, lng: loc.lng };
+      });
+
+      // 最終店舗→デポ帰社（キャッシュ対応：帰社は直線距離で計算）
+      const returnDist = calcDist(cur, depot);
+      const returnMin = Math.ceil(returnDist / speed * 60);
+      if (returnMin > 0) {
+        events.push({ type: 'return', bin: binNum, start: curMin, dur: returnMin, label: 'デポ帰社' });
+        curMin += returnMin;
+      }
+      cur = { ...depot };
+      isFirstStop = true; // 2便もデポ出発なのでリセット
+    });
+
+    schedules.push({ driver, events, endMin: curMin });
+  });
+
+  if (schedules.length === 0) {
+    document.getElementById('gantt-container').innerHTML = '<p style="color:rgba(255,255,255,0.3);padding:20px;text-align:center;">割り当てデータがありません。配車割り当てを先に行ってください</p>';
+    return;
+  }
+
+  // 時間軸の範囲
+  const maxEnd = Math.max(...schedules.map(s => s.endMin)) + 30;
+  const startHour = Math.floor(departMin / 60);
+  const endHour = Math.ceil(maxEnd / 60);
+  const totalMin = (endHour - startHour) * 60;
+  const PX_PER_MIN = 3; // 1分あたりピクセル
+  const totalPx = totalMin * PX_PER_MIN;
+
+  // 時間ラベル
+  const timeLabels = [];
+  for (let h = startHour; h <= endHour; h++) {
+    timeLabels.push(`${String(h).padStart(2,'0')}:00`);
+  }
+
+  // HTML生成
+  const TYPE_COLORS = {
+    load:   'rgba(251,191,36,0.7)',
+    travel: 'rgba(255,255,255,0.15)',
+    unload: null, // ドライバーカラー
+    return: 'rgba(255,255,255,0.08)',
+  };
+
+  let html = `<div class="gantt-chart">`;
+  // ヘッダー
+  html += `<div class="gantt-header"><div class="gantt-name-col">ドライバー</div><div class="gantt-time-area"><div class="gantt-time-labels" style="width:${totalPx}px;">`;
+  timeLabels.forEach(t => { html += `<div class="gantt-time-label" style="width:${60*PX_PER_MIN}px;">${t}</div>`; });
+  html += `</div></div></div>`;
+
+  // 各ドライバー行
+  schedules.sort((a,b) => (a.driver.name||'').localeCompare(b.driver.name||'')).forEach((sch, idx) => {
+    const color = COLORS[idx % COLORS.length];
+    const endStr = minToStr(sch.endMin);
+    html += `<div class="gantt-row">
+      <div class="gantt-driver-name" style="border-left:3px solid ${color};">
+        ${sch.driver.name}<div class="gantt-driver-sub">終了 ${endStr}</div>
+      </div>
+      <div class="gantt-bars"><div class="gantt-bars-inner" style="width:${totalPx}px;">`;
+
+    // グリッド線
+    for (let h = startHour; h <= endHour; h++) {
+      const x = (h * 60 - departMin + (departMin % 60 === 0 ? 0 : 60 - departMin % 60)) * PX_PER_MIN;
+      html += `<div class="gantt-grid-line" style="left:${(h*60 - startHour*60)*PX_PER_MIN}px;"></div>`;
+    }
+
+    sch.events.forEach(ev => {
+      const left = (ev.start - startHour * 60) * PX_PER_MIN;
+      const width = Math.max(ev.dur * PX_PER_MIN, 2);
+      const bg = ev.type === 'unload' ? color : TYPE_COLORS[ev.type];
+      const opacity = ev.type === 'travel' || ev.type === 'return' ? '0.5' : '1';
+      const cls = `gantt-bar ${ev.bin === 2 ? 'bin2' : 'bin1'} ${ev.type === 'travel' || ev.type === 'return' ? 'travel' : ''}`;
+      const text = width > 30 ? (ev.type === 'unload' ? ev.label.substring(0,8) : ev.label) : '';
+      html += `<div class="${cls}" style="left:${left}px;width:${width}px;background:${bg};opacity:${opacity};"
+        onmouseenter="showTip(event,'${ev.label.replace(/'/g,"\\'")}','${minToStr(ev.start)}','${minToStr(ev.start+ev.dur)}',${ev.dur},${ev.items||0})"
+        onmouseleave="hideTip()">${text}</div>`;
+    });
+
+    html += `</div></div></div>`;
+  });
+
+  // 凡例
+  html += `<div class="gantt-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,0.7);"></div>積み込み</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3498db;"></div>荷下ろし（1便）</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3498db;opacity:0.75;border:1px solid rgba(255,255,255,0.2);"></div>荷下ろし（2便）</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(255,255,255,0.15);"></div>移動</div>
+  </div></div>`;
+
+  document.getElementById('gantt-container').innerHTML = html;
+}
+
+function showTip(e, name, start, end, dur, items) {
+  const t = document.getElementById('tooltip');
+  t.innerHTML = `<div class="tt-title">${name}</div>
+    <div class="tt-row">🕐 ${start} ～ ${end}</div>
+    <div class="tt-row">⏱ ${dur}分</div>
+    ${items > 0 ? `<div class="tt-row">📦 ${items}個</div>` : ''}`;
+  t.style.display = 'block';
+  t.style.left = (e.clientX + 12) + 'px';
+  t.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
+
+function setupRealtime() {
+  sbClient.channel('progress-changes')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_stops', filter: `delivery_id=eq.${deliveryId}` },
+      payload => { const idx = allStops.findIndex(s => s.id === payload.new.id); if (idx >= 0) allStops[idx] = payload.new; renderProgress(); })
+    .subscribe();
+}
+
+init();
+</script>
+</body>
+</html>

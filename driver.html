@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>配送確認</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: sans-serif; background: #f0f4f8; min-height: 100vh; }
+
+    #header {
+      background: #2c3e50; color: white;
+      padding: 14px 16px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    #header h1 { font-size: 16px; margin-bottom: 2px; }
+    #header .sub { font-size: 12px; color: #aee; }
+
+    #loading {
+      text-align: center; padding: 60px 20px; color: #888;
+    }
+    #loading .spinner {
+      width: 40px; height: 40px; border: 4px solid #ddd;
+      border-top-color: #2c3e50; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #summary-bar {
+      background: white; margin: 12px; border-radius: 10px;
+      padding: 12px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      display: flex; gap: 16px; font-size: 13px;
+    }
+    .summary-item { text-align: center; flex: 1; }
+    .summary-item .val { font-size: 20px; font-weight: bold; color: #2c3e50; }
+    .summary-item .label { font-size: 11px; color: #888; margin-top: 2px; }
+
+    #filter-bar {
+      display: flex; gap: 8px; padding: 0 12px 8px;
+    }
+    .filter-btn {
+      flex: 1; padding: 7px; border: 1px solid #ddd; background: white;
+      border-radius: 6px; font-size: 12px; cursor: pointer; color: #555;
+    }
+    .filter-btn.active { background: #2c3e50; color: white; border-color: #2c3e50; font-weight: bold; }
+
+    #stop-list { padding: 0 12px 80px; }
+
+    .stop-card {
+      background: white; border-radius: 12px; margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden;
+      transition: opacity 0.3s;
+    }
+    .stop-card.done { opacity: 0.5; }
+
+    .stop-card-header {
+      display: flex; align-items: center; padding: 12px 14px 8px;
+      gap: 10px;
+    }
+    .stop-num-badge {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 14px; color: white; flex-shrink: 0;
+    }
+    .stop-info { flex: 1; min-width: 0; }
+    .stop-name { font-size: 15px; font-weight: bold; color: #1a1a1a; }
+    .stop-bin  { font-size: 11px; color: white; padding: 2px 7px; border-radius: 3px; margin-left: 6px; }
+    .bin1 { background: #2980b9; }
+    .bin2 { background: #e67e22; }
+
+    .stop-addr {
+      font-size: 12px; color: #666; margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stop-meta {
+      display: flex; gap: 10px; padding: 6px 14px 10px 56px;
+      font-size: 12px; color: #888;
+    }
+    .meta-item { display: flex; align-items: center; gap: 4px; }
+
+    .stop-actions {
+      display: flex; border-top: 1px solid #f0f0f0;
+    }
+    .action-btn {
+      flex: 1; padding: 11px 8px; border: none; background: none;
+      font-size: 13px; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 6px; color: #555;
+      transition: background 0.15s;
+    }
+    .action-btn:active { background: #f5f5f5; }
+    .action-btn.nav { color: #2980b9; border-right: 1px solid #f0f0f0; }
+    .action-btn.complete { color: #27ae60; }
+    .action-btn.completed { color: #aaa; }
+    .action-btn.undo { color: #e67e22; }
+
+    .done-stamp {
+      text-align: center; padding: 4px;
+      font-size: 11px; color: #27ae60; font-weight: bold;
+      background: #f0fff4; border-top: 1px solid #d4edda;
+    }
+
+    #empty-msg {
+      text-align: center; padding: 60px 20px; color: #888; font-size: 14px;
+    }
+
+    /* 完了トースト */
+    #toast {
+      display: none; position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%); background: #27ae60; color: white;
+      padding: 10px 24px; border-radius: 20px; font-size: 13px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2); z-index: 999;
+    }
+    /* ログイン画面 */
+    #login-screen {
+      min-height: 100vh;
+      background: #2c3e50;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 32px 24px;
+    }
+    .login-logo { font-size: 48px; margin-bottom: 16px; }
+    .login-title { color: white; font-size: 20px; margin-bottom: 6px; }
+    .login-desc  { color: #aee; font-size: 13px; margin-bottom: 32px; }
+    .login-box {
+      background: white; border-radius: 14px; padding: 28px 24px;
+      width: 100%; max-width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .login-box label { font-size: 13px; color: #555; display: block; margin-bottom: 6px; }
+    .login-box input {
+      width: 100%; padding: 13px 14px; border: 2px solid #ddd;
+      border-radius: 8px; font-size: 20px; font-family: sans-serif;
+      text-align: center; letter-spacing: 4px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .login-box input:focus { border-color: #2c3e50; }
+    .login-btn {
+      width: 100%; margin-top: 16px; padding: 14px;
+      background: #2c3e50; color: white; border: none;
+      border-radius: 8px; font-size: 16px; font-weight: bold;
+      cursor: pointer; font-family: sans-serif;
+    }
+    .login-btn:active { background: #1a252f; }
+    .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; text-align: center; display: none; }
+    #logout-btn {
+      background: rgba(255,255,255,0.15); border: none; color: white;
+      padding: 5px 12px; border-radius: 6px; font-size: 12px;
+      cursor: pointer; font-family: sans-serif; float: right; margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="login-screen" style="display:none;">
+  <div class="login-logo">🚚</div>
+  <h2 class="login-title">配送確認</h2>
+  <p class="login-desc">社員コードを入力してください</p>
+  <div class="login-box">
+    <label>社員コード</label>
+    <input type="text" id="employee-code-input" placeholder="社員コードを入力"
+           inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="login-error">社員コードが見つかりません</div>
+  </div>
+</div>
+
+<div id="header">
+  <button id="logout-btn" onclick="doLogout()" style="display:none;">ログアウト</button>
+  <h1 id="header-title">🚚 配送確認</h1>
+  <div class="sub" id="header-sub">読み込み中...</div>
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>配送データを読み込み中...</p>
+</div>
+
+<div id="main-content" style="display:none;">
+  <div id="summary-bar">
+    <div class="summary-item">
+      <div class="val" id="total-count">0</div>
+      <div class="label">全件</div>
+    </div>
+    <div class="summary-item">
+      <div class="val" id="done-count">0</div>
+      <div class="label">完了</div>
+    </div>
+    <div class="summary-item">
+      <div class="val" id="remain-count">0</div>
+      <div class="label">残り</div>
+    </div>
+    <div class="summary-item">
+      <div class="val" id="total-items">0</div>
+      <div class="label">個数</div>
+    </div>
+  </div>
+
+  <div id="filter-bar">
+    <button class="filter-btn active" id="filter-all"     onclick="setFilter('all')">すべて</button>
+    <button class="filter-btn"        id="filter-pending" onclick="setFilter('pending')">未完了</button>
+    <button class="filter-btn"        id="filter-done"    onclick="setFilter('done')">完了済み</button>
+    <button class="filter-btn"        id="filter-bin1"    onclick="setFilter('bin1')">第1便</button>
+    <button class="filter-btn"        id="filter-bin2"    onclick="setFilter('bin2')">第2便</button>
+  </div>
+
+  <div id="stop-list"></div>
+  <div id="empty-msg" style="display:none;">表示する配送先がありません</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const DRIVER_COLORS = [
+  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4',
+  '#ff5722','#607d8b','#795548','#4caf50','#2196f3',
+  '#ff9800','#9c27b0','#03a9f4','#8bc34a','#f44336'
+];
+
+let stops = [];
+let currentFilter = 'all';
+let deliveryId = null;
+let driverName = null;
+let driverColor = '#2c3e50';
+
+// ===== ログイン関連 =====
+const LOGIN_KEY = 'haisha_driver_login'; // localStorageのキー
+
+function showLoginScreen() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('header').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main-content').style.display = 'none';
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('header').style.display = 'block';
+  document.getElementById('logout-btn').style.display = 'inline-block';
+}
+
+async function doLogin() {
+  const code = document.getElementById('employee-code-input').value.trim();
+  if (!code) return;
+
+  const errorEl = document.getElementById('login-error');
+  errorEl.style.display = 'none';
+  document.querySelector('.login-btn').textContent = '確認中...';
+  document.querySelector('.login-btn').disabled = true;
+
+  try {
+    // SupabaseのdriversテーブルからcodeでドライバーをDriver検索
+    const { data, error } = await sbClient
+      .from('drivers')
+      .select('code, name')
+      .eq('code', code)
+      .single();
+
+    document.querySelector('.login-btn').textContent = 'ログイン';
+    document.querySelector('.login-btn').disabled = false;
+
+    if (error || !data) {
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    // ログイン情報を保存
+    localStorage.setItem(LOGIN_KEY, JSON.stringify({ code, name: data.name }));
+    driverName = data.name;
+    hideLoginScreen();
+    startApp();
+  } catch(e) {
+    document.querySelector('.login-btn').textContent = 'ログイン';
+    document.querySelector('.login-btn').disabled = false;
+    errorEl.textContent = '通信エラーが発生しました';
+    errorEl.style.display = 'block';
+  }
+}
+
+function doLogout() {
+  if (!confirm('ログアウトしますか？')) return;
+  localStorage.removeItem(LOGIN_KEY);
+  location.reload();
+}
+
+// 初期化
+async function init() {
+  // 保存済みログイン確認
+  const saved = localStorage.getItem(LOGIN_KEY);
+  if (saved) {
+    try {
+      const { name } = JSON.parse(saved);
+      driverName = name;
+      hideLoginScreen();
+      startApp();
+      return;
+    } catch(e) {}
+  }
+  // 未ログインならログイン画面を表示
+  showLoginScreen();
+}
+
+async function startApp() {
+  document.getElementById('header-title').textContent = `🚚 ${driverName} の配送`;
+  document.getElementById('loading').style.display = 'block';
+
+  // 最新のdelivery_idを取得（最新の配車データ）
+  const { data: deliveries } = await sbClient
+    .from('deliveries').select('id').order('created_at', { ascending: false }).limit(1);
+  if (deliveries && deliveries.length > 0) {
+    deliveryId = deliveries[0].id;
+  }
+
+  await loadStops();
+  setupRealtime();
+}
+
+async function loadStops() {
+  try {
+    // delivery情報取得
+    const { data: delData } = await sbClient
+      .from('deliveries').select('*').eq('id', deliveryId).single();
+
+    if (delData) {
+      const dateStr = delData.delivery_date;
+      const y=dateStr.slice(0,4), m=parseInt(dateStr.slice(4,6)), d=parseInt(dateStr.slice(6,8));
+      const date=new Date(parseInt(y),m-1,parseInt(d));
+      const youbi='日月火水木金土'[date.getDay()];
+      document.getElementById('header-sub').textContent =
+        `配送日: ${y}年${parseInt(m)}月${parseInt(d)}日（${youbi}）`;
+    }
+
+    // 自分の配送先を取得
+    const { data, error } = await sbClient
+      .from('delivery_stops')
+      .select('*')
+      .eq('delivery_id', deliveryId)
+      .eq('driver_name', driverName)
+      .order('stop_order');
+
+    if (error) throw error;
+    stops = data || [];
+
+    // ドライバーカラー（ドライバー名のハッシュで決定）
+    let hash = 0;
+    for (let i = 0; i < driverName.length; i++) hash = driverName.charCodeAt(i) + ((hash << 5) - hash);
+    driverColor = DRIVER_COLORS[Math.abs(hash) % DRIVER_COLORS.length];
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+
+    updateSummary();
+    renderStops();
+
+  } catch(err) {
+    document.getElementById('loading').innerHTML = `<p style="color:#e74c3c;padding:40px 20px;text-align:center;">エラー: ${err.message}</p>`;
+  }
+}
+
+// リアルタイム更新
+function setupRealtime() {
+  sbClient.channel('delivery-stops-changes')
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'delivery_stops',
+      filter: `delivery_id=eq.${deliveryId}`
+    }, payload => {
+      const idx = stops.findIndex(s => s.id === payload.new.id);
+      if (idx >= 0) stops[idx] = payload.new;
+      updateSummary();
+      renderStops();
+    })
+    .subscribe();
+}
+
+function updateSummary() {
+  const myStops = stops;
+  const done = myStops.filter(s => s.status === 'completed').length;
+  document.getElementById('total-count').textContent  = myStops.length;
+  document.getElementById('done-count').textContent   = done;
+  document.getElementById('remain-count').textContent = myStops.length - done;
+  document.getElementById('total-items').textContent  = myStops.reduce((s,x)=>s+(Number(x.items)||0),0);
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  ['all','pending','done','bin1','bin2'].forEach(id => {
+    document.getElementById('filter-'+id).classList.toggle('active', id===f);
+  });
+  renderStops();
+}
+
+function getFilteredStops() {
+  switch(currentFilter) {
+    case 'pending': return stops.filter(s=>s.status!=='completed');
+    case 'done':    return stops.filter(s=>s.status==='completed');
+    case 'bin1':    return stops.filter(s=>s.bin===1);
+    case 'bin2':    return stops.filter(s=>s.bin===2);
+    default: return stops;
+  }
+}
+
+function renderStops() {
+  const list = document.getElementById('stop-list');
+  const emptyMsg = document.getElementById('empty-msg');
+  const filtered = getFilteredStops();
+
+  if (filtered.length === 0) {
+    list.innerHTML = '';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  list.innerHTML = '';
+
+  filtered.forEach((stop, i) => {
+    const isDone = stop.status === 'completed';
+    const card = document.createElement('div');
+    card.className = 'stop-card' + (isDone ? ' done' : '');
+    card.id = `card-${stop.id}`;
+
+    const completedTime = isDone && stop.completed_at
+      ? new Date(stop.completed_at).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
+      : null;
+
+    // iOSはmaps://、AndroidはGoogleマップアプリを直接起動
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const navUrl = isIOS
+      ? `maps://?daddr=${encodeURIComponent(stop.address)}&dirflg=d`
+      : `google.navigation:q=${encodeURIComponent(stop.address)}`;
+
+    card.innerHTML = `
+      <div class="stop-card-header">
+        <div class="stop-num-badge" style="background:${isDone?'#aaa':driverColor}">${stop.stop_order}</div>
+        <div class="stop-info">
+          <div style="display:flex;align-items:center;">
+            <span class="stop-name">${stop.name}</span>
+            ${stop.bin ? `<span class="stop-bin bin${stop.bin}">第${stop.bin}便</span>` : ''}
+          </div>
+          <div class="stop-addr">${stop.address}</div>
+        </div>
+      </div>
+      ${stop.items || stop.vol ? `
+      <div class="stop-meta">
+        ${stop.items ? `<div class="meta-item">📦 ${stop.items}個</div>` : ''}
+        ${stop.vol   ? `<div class="meta-item">📐 ${stop.vol}才</div>`  : ''}
+      </div>` : ''}
+      <div class="stop-actions">
+        <button class="action-btn nav" onclick="navigate('${navUrl}')">
+          🗺 ナビ起動
+        </button>
+        ${isDone
+          ? `<button class="action-btn undo" onclick="undoComplete('${stop.id}')">↩ 取消</button>`
+          : `<button class="action-btn complete" onclick="markComplete('${stop.id}')">✅ 配送完了</button>`
+        }
+      </div>
+      ${completedTime ? `<div class="done-stamp">✓ ${completedTime} 完了</div>` : ''}
+    `;
+    list.appendChild(card);
+  });
+}
+
+function navigate(url) {
+  // アプリURLスキームで起動、失敗したらWebで開く
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+  if (isIOS || isAndroid) {
+    window.location.href = url;
+  } else {
+    // PCの場合はWebのGoogleマップを新タブで開く
+    const addr = decodeURIComponent(url.split('daddr=')[1] || url.split('q=')[1] || '');
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
+  }
+}
+
+async function markComplete(stopId) {
+  const btn = document.querySelector(`#card-${stopId} .action-btn.complete`);
+  if (btn) { btn.textContent = '送信中...'; btn.disabled = true; }
+
+  const { error } = await sbClient
+    .from('delivery_stops')
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('id', stopId);
+
+  if (error) { showToast('エラーが発生しました'); return; }
+
+  const idx = stops.findIndex(s=>s.id===stopId);
+  if (idx>=0) { stops[idx].status='completed'; stops[idx].completed_at=new Date().toISOString(); }
+  updateSummary();
+  renderStops();
+  showToast('配送完了を記録しました ✅');
+}
+
+async function undoComplete(stopId) {
+  const { error } = await sbClient
+    .from('delivery_stops')
+    .update({ status: 'pending', completed_at: null })
+    .eq('id', stopId);
+
+  if (error) { showToast('エラーが発生しました'); return; }
+
+  const idx = stops.findIndex(s=>s.id===stopId);
+  if (idx>=0) { stops[idx].status='pending'; stops[idx].completed_at=null; }
+  updateSummary();
+  renderStops();
+  showToast('取り消しました');
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 2500);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配車管理システム</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #0f1923;
+      color: white;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* 背景グリッド */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    header {
+      padding: 32px 48px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      position: relative;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 48px;
+      width: 60px; height: 2px;
+      background: #3b82f6;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: #3b82f6;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .logo-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: white;
+    }
+    .logo-text p {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 1px;
+      letter-spacing: 0.1em;
+    }
+    .header-date {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      text-align: right;
+      line-height: 1.6;
+    }
+    .header-date strong {
+      display: block;
+      font-size: 15px;
+      color: rgba(255,255,255,0.8);
+      font-weight: 500;
+    }
+
+    main {
+      padding: 40px 48px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: #3b82f6;
+      font-weight: 500;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+
+    /* メインカード（配車管理） */
+    .main-card {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1a2f4e 100%);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 16px;
+      padding: 36px 40px;
+      margin-bottom: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+      color: white;
+    }
+    .main-card::before {
+      content: '';
+      position: absolute;
+      top: -50%; right: -10%;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .main-card:hover {
+      border-color: rgba(59,130,246,0.6);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(59,130,246,0.15);
+    }
+    .main-card-icon {
+      width: 72px; height: 72px; flex-shrink: 0;
+      background: rgba(59,130,246,0.15);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+    }
+    .main-card-body { flex: 1; }
+    .main-card-body h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .main-card-body p {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.6;
+    }
+    .main-card-badge {
+      background: #3b82f6;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.05em;
+    }
+    .main-card-arrow {
+      font-size: 24px;
+      color: rgba(255,255,255,0.3);
+      flex-shrink: 0;
+    }
+
+    /* サブカードグリッド */
+    .sub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .sub-card {
+      background: #161f2c;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      color: white;
+      display: block;
+      position: relative;
+      overflow: hidden;
+    }
+    .sub-card:hover:not(.disabled) {
+      border-color: rgba(255,255,255,0.2);
+      background: #1a2535;
+      transform: translateY(-1px);
+    }
+    .sub-card.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .sub-card-icon {
+      font-size: 28px;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .sub-card h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .sub-card p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      line-height: 1.5;
+    }
+    .coming-soon {
+      position: absolute;
+      top: 12px; right: 12px;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.3);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.05em;
+    }
+    .sub-card .accent-line {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      border-radius: 0 0 12px 12px;
+    }
+
+    /* 今日の状況 */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+    .stat-card {
+      background: #161f2c;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: white;
+    }
+    .stat-value span {
+      font-size: 13px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.5);
+      margin-left: 4px;
+    }
+    .stat-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 4px;
+    }
+
+    footer {
+      padding: 24px 48px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.2);
+    }
+
+    @media (max-width: 640px) {
+      header { padding: 20px 20px 16px; }
+      main { padding: 24px 20px; }
+      .main-card { padding: 20px; gap: 16px; }
+      .main-card-icon { width: 52px; height: 52px; font-size: 24px; }
+      .main-card-body h2 { font-size: 17px; }
+      footer { padding: 16px 20px; flex-direction: column; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🚚</div>
+    <div class="logo-text">
+      <h1>配車管理システム</h1>
+      <p>MAPLE TREE LOGISTICS</p>
+    </div>
+  </div>
+  <div class="header-date">
+    <strong id="today-date"></strong>
+    <span id="today-time"></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- メイン機能 -->
+  <div class="section-label">メイン機能</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+  <!-- データ読み込みカード -->
+  <div class="main-card" onclick="document.getElementById('file-input-menu').click()" style="cursor:pointer;margin-bottom:0;">
+    <div class="main-card-icon">📂</div>
+    <div class="main-card-body">
+      <h2>データ読み込み</h2>
+      <p>CSVまたはExcelファイルを選択して配車画面を開きます。<br>LYNAのCSV・Excelどちらも対応しています。</p>
+    </div>
+    <span class="main-card-badge">今日の配車はここから</span>
+    <div class="main-card-arrow">›</div>
+  </div>
+  <input type="file" id="file-input-menu" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleFileSelect(event)">
+
+  <a href="index.html" class="main-card" style="background:linear-gradient(135deg,#1a3a2e,#161f2c);border-color:rgba(16,185,129,0.3);margin-bottom:0;">
+    <div class="main-card-icon" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);">🗺</div>
+    <div class="main-card-body">
+      <h2>配車管理画面を開く</h2>
+      <p id="map-card-status">地図・ルート表示・配車割り当て画面を開きます。</p>
+    </div>
+    <div class="main-card-arrow">›</div>
+  </a>
+  </div>
+
+  <!-- サブ機能 -->
+  <div class="section-label">管理機能</div>
+  <div class="sub-grid">
+
+    <a href="drivers.html" class="sub-card">
+      <span class="sub-card-icon">👤</span>
+      <h3>ドライバー管理</h3>
+      <p>ドライバーの登録・社員コード設定・担当エリアの管理</p>
+      <div class="accent-line" style="background:#10b981;"></div>
+    </a>
+
+    <a href="depot.html" class="sub-card">
+      <span class="sub-card-icon">🏭</span>
+      <h3>拠点管理</h3>
+      <p>デポ・協力会社の住所登録。CSVの拠点コードと紐付け設定</p>
+      <div class="accent-line" style="background:#f59e0b;"></div>
+    </a>
+
+    <a href="stores.html" class="sub-card">
+      <span class="sub-card-icon">🏪</span>
+      <h3>店舗管理</h3>
+      <p>届け先コードで店舗を管理。ピン位置がずれている店舗の座標を手動修正</p>
+      <div class="accent-line" style="background:#06b6d4;"></div>
+    </a>
+
+    <div class="sub-card" onclick="exportExcelFromMenu()" style="cursor:pointer;">
+      <span class="sub-card-icon">📥</span>
+      <h3>Excel出力</h3>
+      <p>最後に読み込んだ配車データをExcelファイルで出力します</p>
+      <div class="accent-line" style="background:#e67e22;"></div>
+    </div>
+
+    <a href="history.html" class="sub-card">
+      <span class="sub-card-icon">📋</span>
+      <h3>配車履歴</h3>
+      <p>保存した配車データの呼び出し・エクスポート（月別ファイル保存）・インポート</p>
+      <div class="accent-line" style="background:#a78bfa;"></div>
+    </a>
+
+    <div class="sub-card" onclick="clearAllData()" style="cursor:pointer;">
+      <span class="sub-card-icon">🗑</span>
+      <h3>データをクリア</h3>
+      <p>読み込んだ配車データをすべて削除します。ドライバー・店舗情報は残ります。</p>
+      <div class="accent-line" style="background:#ef4444;"></div>
+    </div>
+
+    <a href="vehicles.html" class="sub-card">
+      <span class="sub-card-icon">🚗</span>
+      <h3>車種設定</h3>
+      <p>車種ごとの最大才数・最大個数を管理。自動配車の積載制限に使用されます</p>
+      <div class="accent-line" style="background:#f59e0b;"></div>
+    </a>
+
+    <a href="courses.html" class="sub-card">
+      <span class="sub-card-icon">🛣</span>
+      <h3>配送コース管理</h3>
+      <p>コース番号と名称を管理。ドライバーの担当コース設定に使用されます</p>
+      <div class="accent-line" style="background:#06b6d4;"></div>
+    </a>
+
+    <a href="progress.html" class="sub-card">
+      <span class="sub-card-icon">📊</span>
+      <h3>配送進捗確認</h3>
+      <p>全ドライバーの配送進捗をリアルタイムで確認。完了件数・残り件数を一覧表示</p>
+      <div class="accent-line" style="background:#3b82f6;"></div>
+    </a>
+
+    <a href="timesettings.html" class="sub-card">
+      <span class="sub-card-icon">⏱</span>
+      <h3>時間管理設定</h3>
+      <p>荷下ろし・積み込み時間の段階設定、移動速度などを管理</p>
+      <div class="accent-line" style="background:#8b5cf6;"></div>
+    </a>
+
+    <a href="driver.html" class="sub-card">
+      <span class="sub-card-icon">📱</span>
+      <h3>ドライバー画面</h3>
+      <p>スマホ用配送確認画面（ドライバー向け）</p>
+      <div class="accent-line" style="background:#06b6d4;"></div>
+    </a>
+
+  </div>
+
+</main>
+
+<footer>
+  <span>配車管理システム v2.0</span>
+  <span>Maple Tree Logistics Center, Kobe</span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  const locs = sessionStorage.getItem('haisha_locations');
+  const hasData = locs && JSON.parse(locs).length > 0;
+
+  if (hasData) {
+    // データがある場合はダイアログを表示
+    let count = 0;
+    try { count = JSON.parse(locs).length; } catch(e) {}
+    showMenuLoadDialog(file, count);
+  } else {
+    doMenuFileLoad(file, false);
+  }
+}
+
+function showMenuLoadDialog(file, count) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#1a2535;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:28px 32px;max-width:420px;width:90%;text-align:center;">
+      <div style="font-size:28px;margin-bottom:12px;">📂</div>
+      <div style="font-size:15px;font-weight:700;color:white;margin-bottom:8px;">データの読み込み方法</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:20px;">
+        現在 <span style="color:#f59e0b;font-weight:700;">${count}件</span> のデータがあります。<br>
+        「<strong style="color:white;">${file.name}</strong>」をどのように読み込みますか？
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="menu-append-btn"
+          style="padding:12px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#10b981;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
+          ➕ 追加読み込み<br>
+          <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.4);">既存の配車はそのまま・新しい届け先だけ追加</span>
+        </button>
+        <button id="menu-overwrite-btn"
+          style="padding:12px;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
+          🔄 上書き読み込み<br>
+          <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.4);">現在のデータをクリアして最初から</span>
+        </button>
+        <button id="menu-cancel-btn"
+          style="padding:8px;background:transparent;border:none;color:rgba(255,255,255,0.3);cursor:pointer;font-size:12px;font-family:inherit;">
+          キャンセル
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('menu-append-btn').onclick = () => { document.body.removeChild(overlay); doMenuFileLoad(file, true); };
+  document.getElementById('menu-overwrite-btn').onclick = () => { document.body.removeChild(overlay); doMenuFileLoad(file, false); };
+  document.getElementById('menu-cancel-btn').onclick = () => { document.body.removeChild(overlay); };
+}
+
+function doMenuFileLoad(file, appendMode) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      sessionStorage.setItem('pendingFileName', file.name);
+      sessionStorage.setItem('pendingFileData', JSON.stringify(Array.from(new Uint8Array(e.target.result))));
+      sessionStorage.setItem('pendingAppendMode', appendMode ? '1' : '0');
+      location.href = 'index.html';
+    } catch(err) {
+      alert('ファイルが大きすぎます。配車画面から直接読み込んでください。');
+      location.href = 'index.html';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function clearAllData() {
+  const locs = sessionStorage.getItem('haisha_locations');
+  if (!locs) { alert('クリアするデータがありません。'); return; }
+  try {
+    const arr = JSON.parse(locs);
+    if (!confirm(`配車データ（${arr.length}件）をクリアしますか？
+ドライバー・店舗情報は削除されません。`)) return;
+  } catch(e) {}
+  sessionStorage.removeItem('haisha_locations');
+  sessionStorage.removeItem('haisha_assignments');
+  sessionStorage.removeItem('haisha_currentDate');
+  sessionStorage.removeItem('haisha_depot');
+  sessionStorage.removeItem('lastExcelData');
+  sessionStorage.removeItem('pendingFileName');
+  sessionStorage.removeItem('pendingFileData');
+  const el = document.getElementById('map-card-status');
+  if (el) el.innerHTML = '地図・ルート表示・配車割り当て画面を開きます。<br><span style="color:rgba(255,255,255,0.4);font-size:12px;">（先にデータを読み込んでください）</span>';
+  alert('配車データをクリアしました。');
+}
+
+function exportExcelFromMenu() {
+  const data = sessionStorage.getItem('lastExcelData');
+  if (!data) {
+    alert('配車データがありません。先にデータを読み込んでください。');
+    return;
+  }
+  try {
+    const obj = JSON.parse(data);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(obj.wsData);
+    ws['!cols'] = [{wch:6},{wch:35},{wch:45},{wch:8},{wch:8},{wch:14},{wch:6}];
+    XLSX.utils.book_append_sheet(wb, ws, '配送ルート');
+    XLSX.writeFile(wb, obj.fileName);
+  } catch(e) {
+    alert('出力エラー: ' + e.message);
+  }
+}
+
+function updateClock() {
+  const now = new Date();
+  const youbi = '日月火水木金土'[now.getDay()];
+  document.getElementById('today-date').textContent =
+    `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（${youbi}）`;
+  document.getElementById('today-time').textContent =
+    `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// sessionStorageのデータ状態を確認して表示
+(function() {
+  const locs = sessionStorage.getItem('haisha_locations');
+  const date = sessionStorage.getItem('haisha_currentDate');
+  const el = document.getElementById('map-card-status');
+  if (!el) return;
+  if (locs) {
+    try {
+      const arr = JSON.parse(locs);
+      const y = date ? date.slice(0,4) : '';
+      const m = date ? parseInt(date.slice(4,6)) : '';
+      const d = date ? parseInt(date.slice(6,8)) : '';
+      el.innerHTML = `<span style="color:#10b981;font-weight:700;">● データあり: ${arr.length}件</span>${date?` / ${y}年${m}月${d}日`:''}`;
+    } catch(e) {}
+  } else {
+    el.innerHTML = '地図・ルート表示・配車割り当て画面を開きます。<br><span style="color:rgba(255,255,255,0.4);font-size:12px;">（先にデータを読み込んでください）</span>';
+  }
+})();
+</script>
+</body>
+</html>

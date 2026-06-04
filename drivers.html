@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドライバー管理 | 配車管理システム</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
+    }
+    header { padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 16px; }
+    .back-btn { background: rgba(255,255,255,0.08); border: none; color: white; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+    .back-btn:hover { background: rgba(255,255,255,0.15); }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 32px 40px; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .section-title { font-size: 11px; letter-spacing: 0.15em; color: #10b981; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; }
+
+    /* 統計 */
+    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: #161f2c; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 16px; }
+    .stat-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+    .stat-value { font-size: 22px; font-weight: 700; }
+    .stat-value span { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.4); }
+
+    /* 検索 */
+    .search-box { margin-bottom: 10px; }
+    .search-box input {
+      width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+    }
+    .search-box input:focus { outline: none; border-color: #10b981; }
+    .search-box input::placeholder { color: rgba(255,255,255,0.25); }
+
+    /* ドライバーリスト */
+    .driver-list { display: flex; flex-direction: column; gap: 5px; }
+    .driver-row {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 9px 12px;
+      display: grid; grid-template-columns: 28px 36px 1fr auto;
+      gap: 8px; align-items: center;
+    }
+    .driver-row:hover { border-color: rgba(255,255,255,0.18); }
+    .driver-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; flex-shrink: 0; }
+    .driver-info { min-width: 0; }
+    .driver-line1 { display: flex; align-items: center; gap: 6px; }
+    .driver-name  { font-size: 13px; font-weight: 700; }
+    .driver-code-badge { font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: rgba(255,255,255,0.6); font-family: monospace; }
+    .depot-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .driver-line2 { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .driver-actions { display: flex; gap: 5px; flex-shrink: 0; }
+    .btn-xs { padding: 3px 9px; border-radius: 4px; border: none; font-size: 11px; cursor: pointer; font-family: inherit; }
+    .btn-edit { background: rgba(255,255,255,0.1); color: white; }
+    .btn-edit:hover { background: rgba(255,255,255,0.2); }
+    .btn-del  { background: rgba(239,68,68,0.15); color: #f87171; }
+    .btn-del:hover { background: rgba(239,68,68,0.28); }
+
+    /* 追加フォーム */
+    .add-form { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+    .add-form h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; color: rgba(255,255,255,0.8); }
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); }
+    .form-group input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 5px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+    .form-group input:focus { outline: none; border-color: #10b981; }
+    .form-group input::placeholder { color: rgba(255,255,255,0.2); }
+    .form-group select { background: white; color: #1a1a1a; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .btn-add { padding: 8px 18px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 700; }
+    .btn-add:hover { background: #059669; }
+    .btn-clr { padding: 8px 14px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-family: inherit; }
+
+
+    .toast { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; }
+    .empty-msg { font-size: 12px; color: rgba(255,255,255,0.3); padding: 12px 0; }
+    @media(max-width:700px){ .layout{grid-template-columns:1fr;} .form-row{grid-template-columns:1fr;} .stats-row{grid-template-columns:repeat(3,1fr);} header{padding:16px 20px;} main{padding:16px 20px 100px;} }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<header>
+  <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
+  <div><h1>👤 ドライバー管理</h1><p>ドライバーの登録・社員コード・担当デポの管理（部署1）</p></div>
+</header>
+<main>
+  <!-- 統計 -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">登録人数</div><div class="stat-value" id="stat-total">0<span>名</span></div></div>
+    <div class="stat-card"><div class="stat-label">本日稼働</div><div class="stat-value" id="stat-available">0<span>名</span></div></div>
+    <div class="stat-card"><div class="stat-label">神戸西担当</div><div class="stat-value" id="stat-kobe">0<span>名</span></div></div>
+    <div class="stat-card"><div class="stat-label">丹波担当</div><div class="stat-value" id="stat-tamba">0<span>名</span></div></div>
+  </div>
+
+  <div class="layout">
+    <!-- 左：リスト -->
+    <div>
+      <div class="section-title">ドライバー一覧</div>
+      <div class="search-box">
+        <input type="text" id="search" placeholder="名前・社員コード・エリアで検索..." oninput="renderList()">
+      </div>
+      <div class="driver-list" id="driver-list"></div>
+    </div>
+
+    <!-- 右：フォーム -->
+    <div>
+      <div class="section-title">ドライバーを追加・編集</div>
+      <div class="add-form">
+        <h3 id="form-title" data-edit-id="">新規登録</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>氏名 *</label>
+            <input type="text" id="new-name" placeholder="例：田中 太郎">
+          </div>
+          <div class="form-group">
+            <label>社員コード *</label>
+            <input type="text" id="new-code" placeholder="例：D001">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>担当デポ</label>
+            <select id="new-depot">
+              <option value="both">両方（神戸西・丹波）</option>
+              <option value="kobe">神戸西デポ</option>
+              <option value="tamba">丹波デポ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>担当車両</label>
+            <select id="new-vehicle">
+              <option value="">-- 未設定 --</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>所属運送会社</label>
+            <select id="new-carrier">
+              <option value="">-- 選択してください --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>電話番号</label>
+            <input type="tel" id="new-phone" placeholder="090-0000-0000">
+          </div>
+        </div>
+        <div class="form-group">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <label>担当コース（1便）</label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" onclick="selectAllCourses('bin1')" style="font-size:11px;padding:2px 8px;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);color:#f59e0b;border-radius:4px;cursor:pointer;">全選択</button>
+              <button type="button" onclick="clearAllCourses('bin1')" style="font-size:11px;padding:2px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.4);border-radius:4px;cursor:pointer;">クリア</button>
+            </div>
+          </div>
+          <div id="courses-checkboxes-bin1" style="
+            background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+            border-radius:6px; padding:8px 10px; max-height:100px; overflow-y:auto;
+            display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;
+          ">
+            <span style="color:rgba(255,255,255,0.3);font-size:12px;">読み込み中...</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <label>担当コース（2便）</label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" onclick="selectAllCourses('bin2')" style="font-size:11px;padding:2px 8px;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);color:#f59e0b;border-radius:4px;cursor:pointer;">全選択</button>
+              <button type="button" onclick="clearAllCourses('bin2')" style="font-size:11px;padding:2px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.4);border-radius:4px;cursor:pointer;">クリア</button>
+            </div>
+          </div>
+          <div id="courses-checkboxes-bin2" style="
+            background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+            border-radius:6px; padding:8px 10px; max-height:100px; overflow-y:auto;
+            display:flex; flex-wrap:wrap; gap:6px;
+          ">
+            <span style="color:rgba(255,255,255,0.3);font-size:12px;">読み込み中...</span>
+          </div>
+          <input type="hidden" id="new-courses" value="">
+          <input type="hidden" id="new-courses-bin2" value="">
+          <label>備考</label>
+          <input type="text" id="new-note" placeholder="メモ">
+        </div>
+        <div class="form-actions">
+          <button class="btn-add" onclick="addDriver()">＋ 登録</button>
+          <button class="btn-clr" onclick="clearForm()">クリア</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let courseMap = {};
+
+function loadCourseMap() {
+  try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) { courseMap = {}; }
+}
+
+function renderCourseCheckboxes(selectedCourses, selectedCoursesBin2) {
+  loadCourseMap();
+  const nums = Object.keys(courseMap).sort();
+  const emptyMsg = '<span style="color:rgba(255,255,255,0.3);font-size:12px;">courses.htmlでコースを登録してください</span>';
+
+  ['bin1','bin2'].forEach(bin => {
+    const wrap = document.getElementById('courses-checkboxes-' + bin);
+    if (!wrap) return;
+    if (nums.length === 0) { wrap.innerHTML = emptyMsg; return; }
+    const selected = bin === 'bin1' ? (selectedCourses || []) : (selectedCoursesBin2 || []);
+    wrap.innerHTML = '';
+    nums.forEach(num => {
+      const checked = selected.includes(num);
+      const cn = (v => typeof v === 'string' ? v : (v ? v.name||'' : ''))(courseMap[num]);
+      const name = cn ? num + ' ' + cn : num;
+      const item = document.createElement('label');
+      item.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 4px;background:rgba(255,255,255,0.05);border-radius:4px;';
+      item.innerHTML = `<input type="checkbox" value="${num}" ${checked ? 'checked' : ''}
+        onchange="updateCoursesHidden()" style="cursor:pointer;"> ${name}`;
+      wrap.appendChild(item);
+    });
+  });
+  updateCoursesHidden();
+}
+
+function selectAllCourses(bin) {
+  document.querySelectorAll('#courses-checkboxes-' + bin + ' input[type=checkbox]').forEach(cb => cb.checked = true);
+  updateCoursesHidden();
+}
+
+function clearAllCourses(bin) {
+  document.querySelectorAll('#courses-checkboxes-' + bin + ' input[type=checkbox]').forEach(cb => cb.checked = false);
+  updateCoursesHidden();
+}
+
+function updateCoursesHidden() {
+  const checked1 = [...document.querySelectorAll('#courses-checkboxes-bin1 input[type=checkbox]:checked')].map(cb => cb.value);
+  const checked2 = [...document.querySelectorAll('#courses-checkboxes-bin2 input[type=checkbox]:checked')].map(cb => cb.value);
+  const h1 = document.getElementById('new-courses');
+  const h2 = document.getElementById('new-courses-bin2');
+  if (h1) h1.value = checked1.join(',');
+  if (h2) h2.value = checked2.join(',');
+}
+
+const DRIVER_COLORS = [
+  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4',
+  '#ff5722','#607d8b','#795548','#4caf50','#2196f3',
+  '#ff9800','#9c27b0','#03a9f4','#8bc34a','#f44336'
+];
+const DEPOT_COLOR = { kobe:'#3b82f6', tamba:'#10b981', both:'#8b5cf6' };
+const DEPOT_LABEL = { kobe:'神戸西', tamba:'丹波', both:'両方' };
+
+let drivers = [];
+
+function loadDrivers() {
+  try { const d = localStorage.getItem('haisha_drivers'); if (d) drivers = JSON.parse(d); } catch(e) { drivers = []; }
+}
+function saveDrivers() { localStorage.setItem('haisha_drivers', JSON.stringify(drivers)); }
+
+// Supabaseにドライバー1件をupsert（登録・更新）
+async function syncDriverToSupabase(driver) {
+  try {
+    await sbClient.from('drivers').upsert({
+      code: driver.code || '',
+      name: driver.name || '',
+      depot: driver.depot || '',
+      vehicle: driver.vehicle || '',
+      vehicle_id: String(driver.vehicleId || ''),
+      phone: driver.phone || '',
+      area: driver.area || '',
+      courses: driver.courses ? driver.courses.join(',') : '',
+      courses_bin2: driver.coursesBin2 ? driver.coursesBin2.join(',') : '',
+      carrier: String(driver.carrier || ''),
+      available_today: driver.availableToday !== false,
+      note: driver.note || ''
+    }, { onConflict: 'code' });
+  } catch(e) { console.error('Supabase sync error:', e); }
+}
+
+// Supabaseからドライバー1件を削除
+async function deleteDriverFromSupabase(id) {
+  try {
+    await sbClient.from('drivers').delete().eq('id', id);
+  } catch(e) { console.error('Supabase delete error:', e); }
+}
+
+function getSortKey(d) {
+  const code = (d.code || 'zzz').toLowerCase();
+  return code.padStart(20, '0');
+}
+
+function updateStats() {
+  document.getElementById('stat-total').innerHTML      = `${drivers.length}<span>名</span>`;
+  const avail = drivers.filter(d=>d.availableToday!==false).length;
+  const statAvail = document.getElementById('stat-available');
+  if (statAvail) statAvail.innerHTML = `${avail}<span>名</span>`;
+  document.getElementById('stat-kobe').innerHTML   = `${drivers.filter(d=>d.depot==='kobe'||d.depot==='both'||!d.depot).length}<span>名</span>`;
+  document.getElementById('stat-tamba').innerHTML  = `${drivers.filter(d=>d.depot==='tamba'||d.depot==='both'||!d.depot).length}<span>名</span>`;
+}
+
+function renderList() {
+  const el = document.getElementById('driver-list');
+  const q  = document.getElementById('search').value.toLowerCase();
+  const filtered = [...drivers]
+    .filter(d => d.name.toLowerCase().includes(q) || (d.code||'').toLowerCase().includes(q) || (d.area||'').toLowerCase().includes(q))
+    .sort((a,b) => getSortKey(a).localeCompare(getSortKey(b)));
+
+  el.innerHTML = '';
+  if (filtered.length === 0) { el.innerHTML = '<p class="empty-msg">ドライバーが登録されていません</p>'; return; }
+
+  filtered.forEach((d, idx) => {
+    const color     = DRIVER_COLORS[drivers.indexOf(d) % DRIVER_COLORS.length];
+    const depotColor= DEPOT_COLOR[d.depot||'both'];
+    const depotLabel= DEPOT_LABEL[d.depot||'both'];
+    const initial   = d.name.replace(/\s/g,'').slice(-1) || '?';
+    const line2parts= [];
+    if (d.carrier) line2parts.push('🏢'+getCarrierName(d.carrier));
+    if (d.vehicle) line2parts.push('🚛'+d.vehicle);
+    if (d.area)    line2parts.push('📍'+d.area);
+    if (d.courses && d.courses.length > 0) {
+      const labels = d.courses.map(c => { const v=courseMap[c]; return v ? (typeof v==='string'?v:(v.name||c)) : c; });
+      line2parts.push('1便:'+labels.join('・'));
+    }
+    if (d.coursesBin2 && d.coursesBin2.length > 0) {
+      const labels2 = d.coursesBin2.map(c => { const v=courseMap[c]; return v ? (typeof v==='string'?v:(v.name||c)) : c; });
+      line2parts.push('2便:'+labels2.join('・'));
+    }
+    if (d.phone)   line2parts.push('📞'+d.phone);
+    if (d.note)    line2parts.push(d.note);
+
+    const row = document.createElement('div');
+    row.className = 'driver-row';
+    row.style.borderLeft = `3px solid ${color}`;
+    if (d.availableToday === false) row.style.opacity = '0.4';
+    if (d.yoizumiToday) row.style.background = 'rgba(139,92,246,0.12)';
+    row.innerHTML = `
+      <input type="checkbox" ${d.availableToday!==false?'checked':''} onchange="toggleAvailable(${d.id},this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:#10b981;justify-self:center;">
+      <div class="driver-avatar" style="background:${color};">${initial}</div>
+      <div class="driver-info">
+        <div class="driver-line1">
+          <span class="driver-name">${d.name}</span>
+          ${d.code?`<span class="driver-code-badge">${d.code}</span>`:''}
+          <span class="depot-dot" style="background:${depotColor};" title="${depotLabel}"></span>
+        </div>
+        <div class="driver-line2">${line2parts.join('　')||''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
+        <div style="display:flex;gap:5px;">
+          <button class="btn-xs btn-edit" onclick="editDriver(${d.id})">編集</button>
+          <button class="btn-xs btn-del" onclick="deleteDriver(${d.id})">削除</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.5);">
+          <input type="checkbox" ${d.yoizumiToday?'checked':''} onchange="toggleYoizumi(${d.id},this.checked)" style="cursor:pointer;accent-color:#8b5cf6;">🌙宵積み
+        </label>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+  updateStats();
+}
+
+function addDriver() {
+  const name    = document.getElementById('new-name').value.trim();
+  const code    = document.getElementById('new-code').value.trim();
+  const depot   = document.getElementById('new-depot').value;
+  const vehicleId = document.getElementById('new-vehicle').value;
+  const vehicle = (function() { try { var vs = JSON.parse(localStorage.getItem('haisha_vehicles')||'[]'); var v = vs.find(function(x){ return String(x.id)===String(vehicleId); }); return v ? v.name : ''; } catch(e){ return ''; } })();
+  const phone   = document.getElementById('new-phone').value.trim();
+  const area    = document.getElementById('new-area') ? document.getElementById('new-area').value.trim() : '';
+  const coursesRaw = (document.getElementById('new-courses').value || '').trim();
+  const courses = coursesRaw ? coursesRaw.split(',').map(c => c.trim()).filter(Boolean) : [];
+  const coursesBin2Raw = (document.getElementById('new-courses-bin2') ? document.getElementById('new-courses-bin2').value || '' : '').trim();
+  const coursesBin2 = coursesBin2Raw ? coursesBin2Raw.split(',').map(c => c.trim()).filter(Boolean) : [];
+  const carrier  = document.getElementById('new-carrier').value;
+  const yoizumi  = false;
+  const note    = document.getElementById('new-note').value.trim();
+  if (!name) { alert('氏名は必須です'); return; }
+  if (!code) { alert('社員コードは必須です'); return; }
+
+  const editId = document.getElementById('form-title').dataset.editId || '';
+  let savedDriver = null;
+  if (editId) {
+    const idx = drivers.findIndex(d => String(d.id) === String(editId));
+    if (idx >= 0) {
+      drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note };
+      savedDriver = drivers[idx]; // ← editIdが消える前に取得
+    }
+    document.getElementById('form-title').textContent = '新規登録';
+    document.getElementById('form-title').dataset.editId = '';
+    showToast('更新しました');
+  } else {
+    if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
+    const newDriver = { id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note };
+    drivers.push(newDriver);
+    savedDriver = newDriver; // ← 新規登録したドライバーを取得
+    showToast(`${name} を登録しました`);
+  }
+  if (savedDriver) syncDriverToSupabase(savedDriver);
+  saveDrivers(); renderList(); clearForm();
+}
+
+function editDriver(id) {
+  const d = drivers.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('new-name').value    = d.name;
+  document.getElementById('new-code').value    = d.code || '';
+  document.getElementById('new-depot').value   = d.depot || 'both';
+  updateVehicleOptions(d.vehicleId || '');
+  document.getElementById('new-phone').value   = d.phone || '';
+  if (document.getElementById('new-area')) document.getElementById('new-area').value = d.area || '';
+  renderCourseCheckboxes(d.courses || [], d.coursesBin2 || []);
+  document.getElementById('new-carrier').value  = d.carrier || '';
+  document.getElementById('new-note').value    = d.note || '';
+  document.getElementById('form-title').textContent = `編集: ${d.name}`;
+  document.getElementById('form-title').dataset.editId = d.id;
+  window.scrollTo(0, 0);
+}
+
+function deleteDriver(id) {
+  const d = drivers.find(x => x.id === id);
+  if (!d || !confirm(`「${d.name}」を削除しますか？`)) return;
+  drivers = drivers.filter(x => x.id !== id);
+  saveDrivers(); renderList(); showToast('削除しました');
+  deleteDriverFromSupabase(id);
+}
+
+function clearForm() {
+  ['new-name','new-code','new-phone','new-note'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('new-courses').value = '';
+  if (document.getElementById('new-courses-bin2')) document.getElementById('new-courses-bin2').value = '';
+  renderCourseCheckboxes([], []);
+  updateVehicleOptions('');
+  document.getElementById('new-depot').value   = 'both';
+  document.getElementById('new-carrier').value  = '';
+  document.getElementById('form-title').textContent = '新規登録';
+  document.getElementById('form-title').dataset.editId = '';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+function toggleAvailable(id, val) {
+  const d = drivers.find(x=>x.id===id);
+  if (d) { d.availableToday = val; saveDrivers(); updateStats(); renderList(); syncDriverToSupabase(d); }
+}
+function toggleYoizumi(id, val) {
+  const d = drivers.find(x=>x.id===id);
+  if (d) { d.yoizumiToday = val; saveDrivers(); renderList(); syncDriverToSupabase(d); }
+}
+function getCarrierName(id) {
+  try {
+    const depots = JSON.parse(localStorage.getItem('haisha_depots')||'[]');
+    const d = depots.find(x=>String(x.id)===String(id));
+    return d ? d.name : id;
+  } catch(e){ return id; }
+}
+function getDepotName(id) {
+  try {
+    const depots = JSON.parse(localStorage.getItem('haisha_depots')||'[]');
+    const d = depots.find(x=>String(x.id)===String(id));
+    return d ? d.name : id;
+  } catch(e){ return id; }
+}
+function updateCarrierOptions() {
+  try {
+    const depots = JSON.parse(localStorage.getItem('haisha_depots')||'[]');
+    // 運送会社セレクト更新
+    const csel = document.getElementById('new-carrier');
+    const cval = csel.value;
+    csel.innerHTML = '<option value="">-- 選択してください --</option>';
+    depots.filter(d=>d.type==='own'||d.type==='carrier').forEach(d=>{
+      const opt=document.createElement('option');
+      opt.value=d.id; opt.textContent=d.name;
+      csel.appendChild(opt);
+    });
+    csel.value = cval;
+
+  } catch(e){}
+}
+function updateVehicleOptions(selectedId) {
+  var vehicles = [];
+  try { vehicles = JSON.parse(localStorage.getItem('haisha_vehicles') || '[]'); } catch(e) {}
+  var sel = document.getElementById('new-vehicle');
+  var cur = selectedId !== undefined ? selectedId : sel.value;
+  sel.innerHTML = '<option value="">-- 未設定 --</option>';
+  vehicles.forEach(function(v) {
+    var opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = v.name + (v.maxVol ? '（最大' + v.maxVol + '才/' + v.maxItems + '個）' : '');
+    if (String(v.id) === String(cur)) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+loadCourseMap();
+loadDrivers();
+updateCarrierOptions();
+updateVehicleOptions('');
+renderList();
+setTimeout(() => renderCourseCheckboxes([], []), 0);
+</script>
+</body>
+</html>

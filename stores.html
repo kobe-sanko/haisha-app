@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店舗管理 | 配車管理システム</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
+    }
+    header {
+      padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex; align-items: center; gap: 16px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.08); border: none; color: white;
+      padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.15); }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: calc(100vh - 73px); }
+
+    /* 左：店舗一覧 */
+    .left-panel {
+      border-right: 1px solid rgba(255,255,255,0.08);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .left-header {
+      padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .section-title { font-size: 11px; letter-spacing: 0.15em; color: #06b6d4; font-weight: 500; text-transform: uppercase; flex: 1; }
+    .store-count { font-size: 11px; color: rgba(255,255,255,0.3); }
+    .search-box {
+      padding: 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+    }
+    .search-box input {
+      width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: white; border-radius: 6px; padding: 7px 12px; font-size: 13px; font-family: inherit;
+    }
+    .search-box input:focus { outline: none; border-color: #06b6d4; }
+    .search-box input::placeholder { color: rgba(255,255,255,0.2); }
+
+    .filter-bar {
+      padding: 8px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; gap: 6px; flex-shrink: 0;
+    }
+    .filter-btn {
+      padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.12);
+      background: transparent; color: rgba(255,255,255,0.5); font-size: 11px; cursor: pointer; font-family: inherit;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .filter-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
+
+    .store-list { flex: 1; overflow-y: auto; padding: 8px 12px; }
+    .store-list::-webkit-scrollbar { width: 4px; }
+    .store-list::-webkit-scrollbar-track { background: transparent; }
+    .store-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    .store-row {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 6px; padding: 6px 10px; margin-bottom: 3px;
+      cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+    }
+    .store-row:hover { border-color: rgba(6,182,212,0.4); background: #1a2535; }
+    .store-row.selected { border-color: #06b6d4; background: rgba(6,182,212,0.08); }
+    .store-row.has-custom { border-left: 3px solid #10b981; }
+    .store-row.no-coord { border-left: 3px solid #f59e0b; }
+
+    .store-info { flex: 1; min-width: 0; }
+    .store-code { font-size: 10px; color: #06b6d4; font-family: monospace; margin-bottom: 2px; }
+    .store-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .store-addr { font-size: 11px; color: rgba(255,255,255,0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .store-badge {
+      font-size: 10px; padding: 2px 7px; border-radius: 3px; flex-shrink: 0; font-weight: 700;
+    }
+    .badge-custom { background: rgba(16,185,129,0.2); color: #10b981; }
+    .badge-auto   { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.3); }
+    .badge-nocoord{ background: rgba(245,158,11,0.2); color: #f59e0b; }
+
+    /* 右：編集パネル */
+    .right-panel { display: flex; flex-direction: column; overflow: hidden; }
+    .right-header {
+      padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0;
+    }
+    .right-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; color: rgba(255,255,255,0.2); text-align: center;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state p { font-size: 13px; line-height: 1.8; }
+
+    .edit-form { display: flex; flex-direction: column; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+    .form-group input {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+    }
+    .form-group input:focus { outline: none; border-color: #06b6d4; }
+    .form-group input[readonly] { opacity: 0.5; cursor: default; }
+
+    .coord-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .map-hint {
+      background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.2);
+      border-radius: 8px; padding: 12px; font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.6;
+    }
+    .map-hint strong { color: #06b6d4; }
+
+    /* 地図 */
+    #edit-map {
+      width: 100%; height: 500px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 4px; background: #1a2535;
+    }
+    .map-status { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 10px; }
+
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-save {
+      padding: 9px 20px; background: #06b6d4; color: white; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 700;
+    }
+    .btn-save:hover { background: #0891b2; }
+    .btn-geocode {
+      padding: 9px 16px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
+      border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit;
+    }
+    .btn-geocode:hover { background: rgba(255,255,255,0.15); }
+    .btn-reset {
+      padding: 9px 16px; background: rgba(239,68,68,0.12); color: #f87171;
+      border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit;
+    }
+    .btn-reset:hover { background: rgba(239,68,68,0.22); }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #10b981; color: white; padding: 10px 24px; border-radius: 20px;
+      font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999;
+      display: none; white-space: nowrap;
+    }
+
+    .stats-bar {
+      padding: 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; gap: 16px; font-size: 11px; flex-shrink: 0;
+    }
+    .stat { color: rgba(255,255,255,0.4); }
+    .stat span { font-weight: 700; }
+    .stat.green span { color: #10b981; }
+    .stat.yellow span { color: #f59e0b; }
+    .stat.blue span { color: #06b6d4; }
+  </style>
+</head>
+<body>
+
+<header>
+  <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
+  <div>
+    <h1>🏪 店舗管理</h1>
+    <p>届け先コードで店舗の座標を管理・修正できます</p>
+  </div>
+</header>
+
+<main>
+  <!-- 左：店舗一覧 -->
+  <div class="left-panel">
+    <div class="left-header">
+      <span class="section-title">登録済み店舗</span>
+      <span class="store-count" id="store-count">0件</span>
+    </div>
+    <div class="stats-bar">
+      <div class="stat green">修正済み <span id="stat-custom">0</span></div>
+      <div class="stat yellow">要確認 <span id="stat-nocoord">0</span></div>
+      <div class="stat blue">自動 <span id="stat-auto">0</span></div>
+    </div>
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="店舗名・コード・住所で検索..." oninput="renderList()">
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all', this)">すべて</button>
+      <button class="filter-btn" onclick="setFilter('custom', this)">修正済み</button>
+      <button class="filter-btn" onclick="setFilter('nocoord', this)">要確認</button>
+      <button class="filter-btn" onclick="setFilter('auto', this)">自動</button>
+    </div>
+    <div class="filter-bar" style="margin-top:6px;flex-wrap:wrap;gap:4px;">
+      <button class="filter-btn active" id="depot-all-btn" onclick="setDepotFilter('', this)">デポ:すべて</button>
+      <button class="filter-btn" onclick="setDepotFilter('2806', this)">🏭 神戸西</button>
+      <button class="filter-btn" onclick="setDepotFilter('2805', this)">🏭 丹波</button>
+    </div>
+    <div id="course-filter-bar" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;"></div>
+    <div class="store-list" id="store-list"></div>
+  </div>
+
+  <!-- 右：編集パネル -->
+  <div class="right-panel">
+    <div class="right-header">
+      <div class="section-title" style="color:#10b981;">座標編集</div>
+    </div>
+    <div class="right-content" id="right-content">
+      <div class="empty-state">
+        <div class="icon">🏪</div>
+        <p>左のリストから店舗を選択してください<br>地図をクリックして座標を修正できます</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E"></script>
+<script>
+// ====================================================
+// データ管理
+// ====================================================
+const STORAGE_KEY = 'haisha_stores'; // { [code]: { name, addr, lat, lng, customLat, customLng, hasCustom } }
+
+let stores = {};      // 全店舗データ
+let currentCode = null; // 選択中のコード
+let currentFilter = 'all';
+let currentCourseFilter = '';
+let currentDepotFilter = '';
+let editMap = null;
+let editMarker = null;
+
+function loadStores() {
+  try {
+    const d = localStorage.getItem(STORAGE_KEY);
+    if (d) stores = JSON.parse(d);
+  } catch(e) { stores = {}; }
+}
+
+function saveStores() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stores));
+  } catch(e) { showToast('保存に失敗しました', true); }
+}
+
+// ====================================================
+// 一覧表示
+// ====================================================
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function setDepotFilter(depot, btn) {
+  currentDepotFilter = depot;
+  document.querySelectorAll('.filter-bar .filter-btn').forEach(b => {
+    if (b.id === 'depot-all-btn' || b.getAttribute('onclick') && b.getAttribute('onclick').includes('setDepotFilter')) {
+      b.classList.remove('active');
+    }
+  });
+  btn.classList.add('active');
+  renderList();
+}
+
+function setCourseFilter(course, btn) {
+  currentCourseFilter = course;
+  document.querySelectorAll('#course-filter-bar .course-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function renderCourseFilterBar() {
+  const bar = document.getElementById('course-filter-bar');
+  if (!bar) return;
+  // ストアからコース一覧を取得
+  const courses = new Set();
+  Object.values(stores).forEach(s => { if (s.course && s.course.trim()) courses.add(s.course.trim()); });
+  // courses.htmlのラベルを取得
+  let courseMap = {};
+  try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) {}
+  // 新旧両形式対応：文字列 or { name, depot }
+  const _cn = num => { const v = courseMap[num]; if (!v) return ''; return typeof v === 'string' ? v : (v.name || ''); };
+
+  const nums = [...courses].sort();
+  bar.innerHTML = '';
+  if (nums.length === 0) return;
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'course-filter-btn filter-btn active';
+  allBtn.textContent = 'コース:すべて';
+  allBtn.onclick = function() { setCourseFilter('', this); };
+  bar.appendChild(allBtn);
+
+  nums.forEach(num => {
+    const label = _cn(num) ? num + ' ' + _cn(num) : 'コース' + num;
+    const btn = document.createElement('button');
+    btn.className = 'course-filter-btn filter-btn';
+    btn.textContent = label;
+    btn.onclick = function() { setCourseFilter(num, this); };
+    bar.appendChild(btn);
+  });
+}
+
+function renderList() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const list = document.getElementById('store-list');
+
+  let entries = Object.entries(stores);
+
+  // フィルター
+  if (currentFilter === 'custom')  entries = entries.filter(([,s]) => s.hasCustom);
+  if (currentFilter === 'nocoord') entries = entries.filter(([,s]) => !s.lat && !s.customLat);
+  if (currentFilter === 'auto')    entries = entries.filter(([,s]) => !s.hasCustom && (s.lat || s.customLat));
+  if (currentCourseFilter) entries = entries.filter(([,s]) => (s.course||'').trim() === currentCourseFilter);
+  if (currentDepotFilter) entries = entries.filter(([,s]) => (s.depot||'') === currentDepotFilter);
+
+  // 検索
+  if (q) {
+    entries = entries.filter(([code, s]) =>
+      code.includes(q) || s.name.toLowerCase().includes(q) || s.addr.toLowerCase().includes(q) || (s.course||'').includes(q)
+    );
+  }
+
+  // 統計更新
+  const all = Object.values(stores);
+  document.getElementById('store-count').textContent = `${all.length}件`;
+  document.getElementById('stat-custom').textContent  = all.filter(s => s.hasCustom).length;
+  document.getElementById('stat-nocoord').textContent = all.filter(s => !s.lat && !s.customLat).length;
+  document.getElementById('stat-auto').textContent    = all.filter(s => !s.hasCustom && (s.lat || s.customLat)).length;
+
+  if (entries.length === 0) {
+    list.innerHTML = '<p style="font-size:12px;color:rgba(255,255,255,0.2);text-align:center;padding:24px;">該当する店舗がありません</p>';
+    return;
+  }
+
+  list.innerHTML = '';
+  entries.forEach(([code, store]) => {
+    const hasCoord = store.customLat || store.lat;
+    const row = document.createElement('div');
+    row.className = 'store-row' + (store.hasCustom ? ' has-custom' : (!hasCoord ? ' no-coord' : ''));
+    if (code === currentCode) row.classList.add('selected');
+    row.onclick = () => selectStore(code);
+
+    const badgeClass = store.hasCustom ? 'badge-custom' : (!hasCoord ? 'badge-nocoord' : 'badge-auto');
+    const badgeText  = store.hasCustom ? '修正済' : (!hasCoord ? '要確認' : '自動');
+
+    row.innerHTML = `
+      <div class="store-info" style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+        <span style="font-size:10px;color:#06b6d4;font-family:monospace;flex-shrink:0;">${code}</span>
+        <span class="store-name" style="flex:1;">${store.name}</span>
+        ${store.course ? `<span style="font-size:10px;color:#f59e0b;flex-shrink:0;">🛣${store.course}</span>` : ''}
+        ${store.depot==='2806' ? `<span style="font-size:10px;color:#06b6d4;flex-shrink:0;">🏭神戸西</span>` : store.depot==='2805' ? `<span style="font-size:10px;color:#a78bfa;flex-shrink:0;">🏭丹波</span>` : ''}
+      </div>
+      <span class="store-badge ${badgeClass}" style="flex-shrink:0;">${badgeText}</span>
+    `;
+    list.appendChild(row);
+  });
+}
+
+// ====================================================
+// 店舗選択・編集
+// ====================================================
+function selectStore(code) {
+  currentCode = code;
+  renderList();
+  renderEditPanel(code);
+}
+
+function renderEditPanel(code) {
+  const store = stores[code];
+  if (!store) return;
+
+  const lat = store.customLat || store.lat || '';
+  const lng = store.customLng || store.lng || '';
+
+  document.getElementById('right-content').innerHTML = `
+    <div class="edit-form">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>届け先コード</label>
+          <input type="text" value="${code}" readonly>
+        </div>
+        <div class="form-group">
+          <label>店舗名</label>
+          <input type="text" id="edit-name" value="${store.name}">
+        </div>
+        <div class="form-group">
+          <label>配送コース</label>
+          <input type="text" id="edit-course" value="${store.course || ''}" placeholder="例：01">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>担当デポ</label>
+          <select id="edit-depot" style="background:#1e2d3d;border:1px solid rgba(255,255,255,0.12);color:white;border-radius:6px;padding:8px 12px;font-size:13px;font-family:inherit;">
+            <option value="" style="background:#1e2d3d;color:white;" ${!store.depot ? 'selected' : ''}>-- 未設定 --</option>
+            <option value="2806" style="background:#1e2d3d;color:white;" ${store.depot==='2806' ? 'selected' : ''}>神戸西デポ（2806）</option>
+            <option value="2805" style="background:#1e2d3d;color:white;" ${store.depot==='2805' ? 'selected' : ''}>丹波デポ（2805）</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>住所</label>
+          <input type="text" id="edit-addr" value="${store.addr}">
+        </div>
+        <div class="form-group">
+          <label>緯度</label>
+          <input type="text" id="edit-lat" placeholder="緯度" value="${lat}" oninput="updateMapFromInput()">
+        </div>
+        <div class="form-group">
+          <label>経度</label>
+          <input type="text" id="edit-lng" placeholder="経度" value="${lng}" oninput="updateMapFromInput()">
+        </div>
+      </div>
+      <div class="map-hint" style="padding:7px 12px;margin-bottom:6px;">
+        <strong>地図をクリック</strong>してピンを移動 ／ 住所変更後「再取得」で座標更新
+      </div>
+      <div id="edit-map"></div>
+      <div class="map-status" id="map-status">地図を読み込み中...</div>
+      <div class="btn-row">
+        <button class="btn-save" onclick="saveCurrentStore()">💾 保存</button>
+        <button class="btn-geocode" onclick="geocodeCurrentAddr()">🔍 住所から再取得</button>
+        ${store.hasCustom ? `<button class="btn-reset" onclick="resetCustom('${code}')">↩ リセット</button>` : ''}
+      </div>
+    </div>
+  `;
+
+  initEditMap(lat, lng, store.name);
+}
+
+function initEditMap(lat, lng, name) {
+  const center = (lat && lng)
+    ? { lat: parseFloat(lat), lng: parseFloat(lng) }
+    : { lat: 34.7309, lng: 135.0867 }; // 神戸西デポ付近
+
+  editMap = new google.maps.Map(document.getElementById('edit-map'), {
+    center, zoom: lat ? 16 : 10,
+    mapTypeControl: false, streetViewControl: false,
+    fullscreenControl: false,
+  });
+
+  if (lat && lng) {
+    editMarker = new google.maps.Marker({
+      position: center, map: editMap, title: name, draggable: true,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: '#06b6d4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+    });
+    editMarker.addListener('dragend', () => {
+      const pos = editMarker.getPosition();
+      document.getElementById('edit-lat').value = pos.lat().toFixed(7);
+      document.getElementById('edit-lng').value = pos.lng().toFixed(7);
+    });
+  } else {
+    editMarker = null;
+  }
+
+  // 地図クリックでピン移動
+  editMap.addListener('click', (e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    document.getElementById('edit-lat').value = lat.toFixed(7);
+    document.getElementById('edit-lng').value = lng.toFixed(7);
+    if (editMarker) {
+      editMarker.setPosition(e.latLng);
+    } else {
+      editMarker = new google.maps.Marker({
+        position: e.latLng, map: editMap, title: stores[currentCode]?.name || '',
+        draggable: true,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: '#06b6d4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+      });
+      editMarker.addListener('dragend', () => {
+        const pos = editMarker.getPosition();
+        document.getElementById('edit-lat').value = pos.lat().toFixed(7);
+        document.getElementById('edit-lng').value = pos.lng().toFixed(7);
+      });
+    }
+    document.getElementById('map-status').textContent = `クリック位置: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  });
+
+  document.getElementById('map-status').textContent = lat
+    ? `現在の座標: ${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`
+    : '座標未登録 — 地図をクリックして設定してください';
+}
+
+function updateMapFromInput() {
+  const lat = parseFloat(document.getElementById('edit-lat').value);
+  const lng = parseFloat(document.getElementById('edit-lng').value);
+  if (!isNaN(lat) && !isNaN(lng) && editMap) {
+    const pos = { lat, lng };
+    editMap.setCenter(pos);
+    if (editMarker) {
+      editMarker.setPosition(pos);
+    } else {
+      editMarker = new google.maps.Marker({
+        position: pos, map: editMap, draggable: true,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: '#06b6d4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+      });
+      editMarker.addListener('dragend', () => {
+        const p = editMarker.getPosition();
+        document.getElementById('edit-lat').value = p.lat().toFixed(7);
+        document.getElementById('edit-lng').value = p.lng().toFixed(7);
+      });
+    }
+  }
+}
+
+function geocodeCurrentAddr() {
+  const addr = document.getElementById('edit-addr').value.trim();
+  if (!addr) return;
+  document.getElementById('map-status').textContent = '住所を検索中...';
+  const gc = new google.maps.Geocoder();
+  gc.geocode({ address: addr }, (results, status) => {
+    if (status === 'OK') {
+      const lat = results[0].geometry.location.lat();
+      const lng = results[0].geometry.location.lng();
+      document.getElementById('edit-lat').value = lat.toFixed(7);
+      document.getElementById('edit-lng').value = lng.toFixed(7);
+      const pos = { lat, lng };
+      editMap.setCenter(pos);
+      editMap.setZoom(16);
+      if (editMarker) {
+        editMarker.setPosition(pos);
+      } else {
+        editMarker = new google.maps.Marker({
+          position: pos, map: editMap, draggable: true,
+          icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: '#06b6d4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+        });
+        editMarker.addListener('dragend', () => {
+          const p = editMarker.getPosition();
+          document.getElementById('edit-lat').value = p.lat().toFixed(7);
+          document.getElementById('edit-lng').value = p.lng().toFixed(7);
+        });
+      }
+      document.getElementById('map-status').textContent = `取得完了: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    } else {
+      document.getElementById('map-status').textContent = `取得失敗: ${status} — 住所を確認してください`;
+    }
+  });
+}
+
+function saveCurrentStore() {
+  if (!currentCode) return;
+  const lat = parseFloat(document.getElementById('edit-lat').value);
+  const lng = parseFloat(document.getElementById('edit-lng').value);
+  const name = document.getElementById('edit-name').value.trim();
+  const addr = document.getElementById('edit-addr').value.trim();
+  const course = document.getElementById('edit-course') ? document.getElementById('edit-course').value.trim() : (stores[currentCode].course || '');
+  const depot = document.getElementById('edit-depot') ? document.getElementById('edit-depot').value : (stores[currentCode].depot || '');
+
+  if (!name || !addr) { showToast('店舗名と住所は必須です', true); return; }
+
+  stores[currentCode] = {
+    ...stores[currentCode],
+    name, addr, course, depot,
+    customLat: isNaN(lat) ? null : lat,
+    customLng: isNaN(lng) ? null : lng,
+    hasCustom: !isNaN(lat) && !isNaN(lng)
+  };
+  saveStores();
+  renderList();
+  renderCourseFilterBar();
+  showToast('保存しました ✅');
+}
+
+function resetCustom(code) {
+  if (!confirm('座標の修正をリセットして自動取得に戻しますか？')) return;
+  if (stores[code]) {
+    stores[code].customLat = null;
+    stores[code].customLng = null;
+    stores[code].hasCustom = false;
+    saveStores();
+    renderList();
+    renderEditPanel(code);
+    showToast('リセットしました');
+  }
+}
+
+// ====================================================
+// トースト
+// ====================================================
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isError ? '#ef4444' : '#10b981';
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+// ====================================================
+// 初期化
+// ====================================================
+loadStores();
+renderCourseFilterBar();
+renderList();
+
+</script>

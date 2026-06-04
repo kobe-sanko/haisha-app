@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配車履歴 | 配車管理システム</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
+    }
+
+    header {
+      padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex; align-items: center; gap: 16px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.08); border: none; color: white;
+      padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.15); }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    main { max-width: 860px; margin: 0 auto; padding: 32px 24px 60px; }
+
+    /* セクションタイトル */
+    .section-title {
+      font-size: 11px; letter-spacing: 0.15em; font-weight: 700;
+      text-transform: uppercase; margin-bottom: 14px;
+    }
+    .section-title.blue   { color: #60a5fa; }
+    .section-title.green  { color: #34d399; }
+    .section-title.purple { color: #a78bfa; }
+
+    /* 操作ボタンエリア */
+    .action-area {
+      display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px;
+    }
+    .btn {
+      padding: 10px 20px; border: none; border-radius: 8px;
+      cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .btn-export  { background: #059669; color: white; }
+    .btn-export:hover  { background: #047857; }
+    .btn-import  { background: rgba(167,139,250,0.2); border: 1px solid rgba(167,139,250,0.4); color: #a78bfa; }
+    .btn-import:hover  { background: rgba(167,139,250,0.3); }
+    .btn-import input  { display: none; }
+
+    .hint-box {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 14px 18px; margin-bottom: 32px;
+      font-size: 12px; color: rgba(255,255,255,0.45); line-height: 1.8;
+    }
+    .hint-box strong { color: rgba(255,255,255,0.7); }
+
+    /* 保存済み一覧 */
+    .snapshot-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px; }
+
+    .snapshot-row {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .snapshot-row:hover { border-color: rgba(255,255,255,0.15); }
+    .snapshot-info { flex: 1; min-width: 0; }
+    .snapshot-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+    .snapshot-meta { font-size: 11px; color: rgba(255,255,255,0.35); }
+
+    .btn-sm {
+      padding: 6px 14px; border: none; border-radius: 6px;
+      cursor: pointer; font-size: 12px; font-family: inherit; font-weight: 700;
+      white-space: nowrap;
+    }
+    .btn-load   { background: #2563eb; color: white; }
+    .btn-load:hover { background: #1d4ed8; }
+    .btn-dl     { background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.3); color: #34d399; }
+    .btn-dl:hover { background: rgba(16,185,129,0.3); }
+    .btn-del    { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.2); color: #f87171; }
+    .btn-del:hover { background: rgba(239,68,68,0.25); }
+
+    .empty-msg {
+      text-align: center; padding: 40px 20px;
+      color: rgba(255,255,255,0.25); font-size: 14px;
+    }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #10b981; color: white; padding: 10px 24px; border-radius: 20px;
+      font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; display: none;
+    }
+    .divider {
+      border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 28px 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
+  <div>
+    <h1>📋 配車履歴</h1>
+    <p>保存した配車データの呼び出し・ファイル保存・読み込み</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- 使い方ヒント -->
+  <div class="hint-box">
+    <strong>💡 使い方</strong><br>
+    ・<strong>呼び出し</strong>：保存した配車を配車管理画面で再開できます<br>
+    ・<strong>ファイルに保存</strong>：1件ずつJSONファイルとしてダウンロード。<code>C:\haisha_app\history\</code> フォルダに保管してください<br>
+    ・<strong>まとめてエクスポート</strong>：ブラウザに保存されている全データを1つのファイルにまとめてダウンロードします<br>
+    ・<strong>ファイルから読み込み</strong>：保管したJSONファイルを読み込んで一覧に追加できます
+  </div>
+
+  <!-- まとめてエクスポート／インポート -->
+  <div class="section-title purple">ファイル操作（まとめて）</div>
+  <div class="action-area">
+    <button class="btn btn-export" onclick="exportAll()">
+      📦 まとめてエクスポート
+    </button>
+    <label class="btn btn-import">
+      📂 ファイルから読み込み
+      <input type="file" accept=".json" onchange="importFile(event)">
+    </label>
+  </div>
+
+  <hr class="divider">
+
+  <!-- 保存済み一覧 -->
+  <div class="section-title blue">ブラウザに保存中のデータ（直近30件）</div>
+  <div class="snapshot-list" id="snapshot-list">
+    <div class="empty-msg">保存されたデータがありません</div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== データ読み込み ==========
+function loadList() {
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('haisha_snapshots') || '[]'); } catch(e) {}
+  return list;
+}
+
+function saveList(list) {
+  localStorage.setItem('haisha_snapshots', JSON.stringify(list));
+}
+
+// ========== 日付フォーマット ==========
+function formatDate(d8) {
+  if (!d8 || d8.length !== 8) return '';
+  var y = d8.slice(0,4), m = parseInt(d8.slice(4,6)), d = parseInt(d8.slice(6,8));
+  var youbi = '日月火水木金土'[new Date(parseInt(y), m-1, d).getDay()];
+  return y + '年' + m + '月' + d + '日（' + youbi + '）';
+}
+
+function formatSavedAt(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return (d.getMonth()+1) + '/' + d.getDate() + ' ' +
+    d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0') + ' 保存';
+}
+
+// ========== 一覧描画 ==========
+function renderList() {
+  var list = loadList();
+  var el = document.getElementById('snapshot-list');
+  if (list.length === 0) {
+    el.innerHTML = '<div class="empty-msg">保存されたデータがありません<br><span style="font-size:12px;">配車管理画面の「💾 保存」ボタンで保存できます</span></div>';
+    return;
+  }
+  el.innerHTML = '';
+  list.forEach(function(s, i) {
+    var row = document.createElement('div');
+    row.className = 'snapshot-row';
+    var count = (s.locations || []).length;
+    var dateLabel = s.currentDate ? formatDate(s.currentDate) : '日付不明';
+    var savedLabel = formatSavedAt(s.savedAt);
+    row.innerHTML =
+      '<div class="snapshot-info">' +
+        '<div class="snapshot-name">' + escHtml(s.name) + '</div>' +
+        '<div class="snapshot-meta">' + dateLabel + '　配送先 ' + count + '件　' + savedLabel + '</div>' +
+      '</div>' +
+      '<button class="btn-sm btn-load" onclick="loadSnapshot(' + i + ')">呼び出し</button>' +
+      '<button class="btn-sm btn-dl"   onclick="exportOne(' + i + ')">ファイルに保存</button>' +
+      '<button class="btn-sm btn-del"  onclick="deleteSnapshot(' + i + ')">削除</button>';
+    el.appendChild(row);
+  });
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ========== 呼び出し ==========
+function loadSnapshot(idx) {
+  var list = loadList();
+  var s = list[idx];
+  if (!s) return;
+  // sessionStorageに渡してindex.htmlで復元
+  sessionStorage.setItem('haisha_restore_snapshot', JSON.stringify(s));
+  location.href = 'index.html';
+}
+
+// ========== 1件ファイルに保存 ==========
+function exportOne(idx) {
+  var list = loadList();
+  var s = list[idx];
+  if (!s) return;
+  var json = JSON.stringify(s, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  // ファイル名：「5月26日の配車.json」
+  a.download = escFilename(s.name) + '.json';
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('「' + s.name + '」をダウンロードしました');
+}
+
+// ========== まとめてエクスポート ==========
+function exportAll() {
+  var list = loadList();
+  if (list.length === 0) {
+    alert('保存されたデータがありません。');
+    return;
+  }
+  var now = new Date();
+  var label = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  var json = JSON.stringify({ exportedAt: now.toISOString(), count: list.length, snapshots: list }, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.download = '配車履歴_' + label + '.json';
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(list.length + '件をエクスポートしました');
+}
+
+// ========== ファイルから読み込み ==========
+function importFile(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var obj = JSON.parse(e.target.result);
+      var incoming = [];
+      // まとめてエクスポートの形式（snapshots配列あり）
+      if (obj.snapshots && Array.isArray(obj.snapshots)) {
+        incoming = obj.snapshots;
+      // 1件の形式（nameキーあり）
+      } else if (obj.name && obj.locations) {
+        incoming = [obj];
+      } else {
+        alert('このファイルは対応していない形式です。');
+        return;
+      }
+
+      var list = loadList();
+      var added = 0;
+      incoming.forEach(function(s) {
+        var existIdx = list.findIndex(function(x) { return x.name === s.name && x.savedAt === s.savedAt; });
+        if (existIdx < 0) {
+          list.unshift(s);
+          added++;
+        }
+      });
+      if (list.length > 30) list = list.slice(0, 30);
+      saveList(list);
+      renderList();
+      showToast(added + '件を読み込みました（重複はスキップ）');
+    } catch(err) {
+      alert('ファイルの読み込みに失敗しました: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+// ========== 削除 ==========
+function deleteSnapshot(idx) {
+  var list = loadList();
+  var s = list[idx];
+  if (!s) return;
+  if (!confirm('「' + s.name + '」を削除しますか？')) return;
+  list.splice(idx, 1);
+  saveList(list);
+  renderList();
+  showToast('削除しました');
+}
+
+// ========== ファイル名用エスケープ ==========
+function escFilename(str) {
+  return String(str).replace(/[\\\/:\*\?"<>\|]/g, '_');
+}
+
+// ========== トースト ==========
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 2500);
+}
+
+// ========== 初期化 ==========
+renderList();
+</script>
+</body>
+</html>
