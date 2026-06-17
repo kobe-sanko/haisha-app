@@ -404,7 +404,7 @@ function renderList() {
     if (d.maxTrips !== null && d.maxTrips !== undefined && d.maxTrips !== '') extraParts.push(d.maxTrips+'便まで');
     if (d.maxTotalItems !== null && d.maxTotalItems !== undefined && d.maxTotalItems !== '') extraParts.push(d.maxTotalItems+'件まで');
     const extraHtml = extraParts.length
-      ? `<div style="font-size:10px;color:rgba(255,255,255,0.45);text-align:right;line-height:1.4;">${extraParts.join('　')}</div>`
+      ? `<span style="font-size:10px;color:rgba(255,255,255,0.45);margin-left:6px;">${extraParts.join('　')}</span>`
       : '';
 
     const row = document.createElement('div');
@@ -420,6 +420,7 @@ function renderList() {
           <span class="driver-name">${d.name}</span>
           ${d.code?`<span class="driver-code-badge">${d.code}</span>`:''}
           <span class="depot-dot" style="background:${depotColor};" title="${depotLabel}"></span>
+          ${extraHtml}
         </div>
         <div class="driver-line2">${line2parts.join('　')||''}</div>
       </div>
@@ -428,7 +429,6 @@ function renderList() {
           <button class="btn-xs btn-edit" onclick="editDriver(${d.id})">編集</button>
           <button class="btn-xs btn-del" onclick="deleteDriver(${d.id})">削除</button>
         </div>
-        ${extraHtml}
         <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.5);">
           <input type="checkbox" ${d.yoizumiToday?'checked':''} onchange="toggleYoizumi(${d.id},this.checked)" style="cursor:pointer;accent-color:#8b5cf6;">🌙宵積み
         </label>
