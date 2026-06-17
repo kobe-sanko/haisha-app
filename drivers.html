@@ -151,6 +151,26 @@
             <input type="tel" id="new-phone" placeholder="090-0000-0000">
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>出発時刻</label>
+            <input type="time" id="new-departure-time">
+          </div>
+          <div class="form-group">
+            <label>最大拘束時間（時間）</label>
+            <input type="number" id="new-max-work-hours" step="0.5" min="0" placeholder="例：8">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>最大便数</label>
+            <input type="number" id="new-max-trips" step="1" min="0" placeholder="例：2">
+          </div>
+          <div class="form-group">
+            <label>最大合計件数</label>
+            <input type="number" id="new-max-total-items" step="1" min="0" placeholder="例：20">
+          </div>
+        </div>
         <div class="form-group">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
             <label>担当コース（1便）</label>
@@ -289,6 +309,10 @@ async function syncDriversFromSupabase() {
       availableToday: row.available_today !== false,
       yoizumiToday: row.yoizumi_today || false,
       note: row.note || '',
+      departureTime: row.departure_time || '',
+      maxWorkHours: (row.max_work_hours !== null && row.max_work_hours !== undefined) ? row.max_work_hours : null,
+      maxTrips: (row.max_trips !== null && row.max_trips !== undefined) ? row.max_trips : null,
+      maxTotalItems: (row.max_total_items !== null && row.max_total_items !== undefined) ? row.max_total_items : null,
     }));
     drivers = synced;
     saveDrivers();
@@ -314,7 +338,11 @@ async function syncDriverToSupabase(driver) {
       courses_bin2: driver.coursesBin2 ? driver.coursesBin2.join(',') : '',
       carrier: String(driver.carrier || ''),
       available_today: driver.availableToday !== false,
-      note: driver.note || ''
+      note: driver.note || '',
+      departure_time: driver.departureTime ? driver.departureTime : null,
+      max_work_hours: (driver.maxWorkHours !== null && driver.maxWorkHours !== undefined && driver.maxWorkHours !== '') ? driver.maxWorkHours : null,
+      max_trips: (driver.maxTrips !== null && driver.maxTrips !== undefined && driver.maxTrips !== '') ? driver.maxTrips : null,
+      max_total_items: (driver.maxTotalItems !== null && driver.maxTotalItems !== undefined && driver.maxTotalItems !== '') ? driver.maxTotalItems : null
     }, { onConflict: 'code' });
   } catch(e) { console.error('Supabase sync error:', e); }
 }
@@ -416,6 +444,10 @@ function addDriver() {
   const carrier  = document.getElementById('new-carrier').value;
   const yoizumi  = false;
   const note    = document.getElementById('new-note').value.trim();
+  const departureTime = document.getElementById('new-departure-time').value || '';
+  const maxWorkHours  = document.getElementById('new-max-work-hours').value !== '' ? Number(document.getElementById('new-max-work-hours').value) : null;
+  const maxTrips      = document.getElementById('new-max-trips').value !== '' ? Number(document.getElementById('new-max-trips').value) : null;
+  const maxTotalItems = document.getElementById('new-max-total-items').value !== '' ? Number(document.getElementById('new-max-total-items').value) : null;
   if (!name) { alert('氏名は必須です'); return; }
   if (!code) { alert('社員コードは必須です'); return; }
 
@@ -424,7 +456,7 @@ function addDriver() {
   if (editId) {
     const idx = drivers.findIndex(d => String(d.id) === String(editId));
     if (idx >= 0) {
-      drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note };
+      drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note, departureTime, maxWorkHours, maxTrips, maxTotalItems };
       savedDriver = drivers[idx]; // ← editIdが消える前に取得
     }
     document.getElementById('form-title').textContent = '新規登録';
@@ -432,7 +464,7 @@ function addDriver() {
     showToast('更新しました');
   } else {
     if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
-    const newDriver = { id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note };
+    const newDriver = { id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note, departureTime, maxWorkHours, maxTrips, maxTotalItems };
     drivers.push(newDriver);
     savedDriver = newDriver; // ← 新規登録したドライバーを取得
     showToast(`${name} を登録しました`);
@@ -453,6 +485,10 @@ function editDriver(id) {
   renderCourseCheckboxes(d.courses || [], d.coursesBin2 || []);
   document.getElementById('new-carrier').value  = d.carrier || '';
   document.getElementById('new-note').value    = d.note || '';
+  document.getElementById('new-departure-time').value   = d.departureTime || '';
+  document.getElementById('new-max-work-hours').value   = (d.maxWorkHours !== null && d.maxWorkHours !== undefined) ? d.maxWorkHours : '';
+  document.getElementById('new-max-trips').value         = (d.maxTrips !== null && d.maxTrips !== undefined) ? d.maxTrips : '';
+  document.getElementById('new-max-total-items').value   = (d.maxTotalItems !== null && d.maxTotalItems !== undefined) ? d.maxTotalItems : '';
   document.getElementById('form-title').textContent = `編集: ${d.name}`;
   document.getElementById('form-title').dataset.editId = d.id;
   window.scrollTo(0, 0);
@@ -467,7 +503,7 @@ function deleteDriver(id) {
 }
 
 function clearForm() {
-  ['new-name','new-code','new-phone','new-note'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['new-name','new-code','new-phone','new-note','new-departure-time','new-max-work-hours','new-max-trips','new-max-total-items'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   document.getElementById('new-courses').value = '';
   if (document.getElementById('new-courses-bin2')) document.getElementById('new-courses-bin2').value = '';
   renderCourseCheckboxes([], []);
